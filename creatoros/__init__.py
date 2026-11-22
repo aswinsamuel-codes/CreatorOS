@@ -1,3 +1,3 @@
 """CreatorOS - an open-source AI content studio (blogs, video, social)."""
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"

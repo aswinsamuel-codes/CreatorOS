@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [0.5.0] - 2026-11-22
 
 ### Added
 - **Docker support**: multi-stage `Dockerfile` (slim runtime, non-root user, health check, FFmpeg),
