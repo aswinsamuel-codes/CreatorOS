@@ -71,6 +71,14 @@ and `posting.py` (one `kind: video` post per file; YouTube settings and the Link
 live in the post's `meta`). Publishers: `youtube.py` (Google OAuth, resumable upload),
 `linkedin.py` (Videos API), `webhook.py` (custom platforms). See [VIDEO_POSTS.md](VIDEO_POSTS.md).
 
+## Marketing agent
+
+`creatoros/modules/marketing/`: `formats.py` (format specs, default targets, best times),
+`planner.py` (brief → strategy + cleaned calendar, stored in the `campaigns` and `calendar`
+tables), `content.py` (writes calendar items and repurposes posts; formats with no target
+become `kind: draft`). The scheduler runs `content.generate_due()` every 30 minutes.
+See [MARKETING.md](MARKETING.md).
+
 ## Agent roles and connections
 
 - `creatoros/personas.py`: built-in roles plus custom; `profile.author_context()` puts

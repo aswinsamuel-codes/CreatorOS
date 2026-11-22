@@ -2,6 +2,21 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Marketing agent**: campaigns from a goal, audience, offer and links → strategy (positioning,
+  pillars, audience insights, KPIs, tips) and a dated content calendar at default best times.
+  Calendar items can be rescheduled, edited, skipped or written now; active campaigns write each
+  piece `marketing.lead_hours` before it's due (job every 30 minutes).
+- Formats: LinkedIn post, X thread, Instagram caption, blog article, short-video script,
+  newsletter. Formats with nowhere to publish become **drafts** (Copy / Mark ready).
+- **♻️ Repurpose** any post into other formats.
+- Marketing tab in the dashboard; campaign and format badges on posts.
+
+### Fixed
+- Pop-up windows now also work outside the Connections tab.
+
 ## [0.3.0] - 2026-11-22
 
 ### Added

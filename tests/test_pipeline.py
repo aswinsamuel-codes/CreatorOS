@@ -22,6 +22,23 @@ POST_REPLY = (
 
 class FakeLLM:
     def complete(self, system, prompt, max_tokens=0, images=None):
+        if "CAMPAIGN BRIEF" in prompt:
+            import json
+            import re as _re
+            start, end = _re.search(r"Dates: (\S+) to (\S+)", prompt).groups()
+            cal = [
+                {"date": start, "time": "25:99", "format": "linkedin_post", "pillar": "Lessons", "topic": "My first AWS bill", "hook": "I paid $400", "cta": "Follow"},
+                {"date": start, "time": "15:00", "format": "video_script", "pillar": "Tips", "topic": "3 cost tricks", "hook": "", "cta": "Save this"},
+                {"date": end, "time": "10:00", "format": "blog_post", "pillar": "Guides", "topic": "Cutting AWS costs", "hook": "", "cta": "Book a call"},
+                {"date": end, "time": "10:00", "format": "tiktok_dance", "pillar": "x", "topic": "invalid format"},
+                {"date": "2001-01-01", "time": "10:00", "format": "linkedin_post", "pillar": "x", "topic": "out of range"},
+            ]
+            return json.dumps({"strategy": {"positioning": "The practical cloud cost person", "pillars": [{"name": "Lessons", "description": "d"}],
+                                            "kpis": ["+500 followers"], "tips": ["Reply to comments"], "audience_insights": ["Bills scare founders"]},
+                               "calendar": cal})
+        if "THIS PIECE" in prompt or "Repurpose the source" in prompt:
+            assert "YOUR ROLE" in system
+            return '{"title": "Piece title", "subtitle": "Sub", "body": "Piece body text", "hashtags": ["#AWS", "Cloud"]}'
         if images and "VIDEO FACTS" in prompt:
             assert len(images) == 6
             return ('{"title": "Deploy FastAPI to AWS <fast>", "description": "Learn to deploy.", '
@@ -398,6 +415,55 @@ def test_custom_webhook_platform():
     assert b64.b64decode(sent["json"]["media"][0]["data_base64"]) == b"IMG"
     connections.delete_custom(cid)
     assert not publishers.is_target(f"custom:{cid}")
+
+
+def test_marketing_campaign():
+    from datetime import date, timedelta
+
+    from creatoros.modules.marketing import content, planner
+
+    cfg = setup()
+    cfg["approval"]["required"] = True
+    planner.get_llm = content.get_llm = lambda cfg, role: FakeLLM()
+    content.notify.send_for_approval = lambda post: None
+    start = (date.today() + timedelta(days=1)).isoformat()
+    cid = db.create_campaign("Cloud costs", {
+        "goal": "Get freelance leads", "audience": "founders", "formats": ["linkedin_post", "video_script", "blog_post"],
+        "targets": {}, "start": start, "weeks": 1, "per_week": 3, "role": "marketing_strategist"})
+    assert planner.plan_campaign(cfg, cid) == 3  # invalid format and out-of-range date dropped
+    camp = db.get_campaign(cid)
+    assert camp["status"] == "active" and camp["strategy"]["positioning"]
+    cal = db.list_calendar(cid)
+    by_fmt = {i["format"]: i for i in cal}
+    assert by_fmt["linkedin_post"]["due"] == f"{start}T09:00:00"  # bad time → best time
+    assert by_fmt["linkedin_post"]["targets"] == ["linkedin"]
+    assert by_fmt["video_script"]["targets"] == []
+    assert by_fmt["blog_post"]["targets"] == ["markdown"]  # blog → blog targets from settings
+
+    cfg["paused"] = True
+    assert content.generate_due(cfg, hours=24 * 9) == []
+    cfg["paused"] = False
+    db.update_campaign(cid, status="paused")
+    assert content.generate_due(cfg, hours=24 * 9) == []
+    db.update_campaign(cid, status="active")
+    ids = content.generate_due(cfg, hours=24 * 9)
+    assert len(ids) == 3 and all(i["status"] == "drafted" and i["post_id"] for i in db.list_calendar(cid))
+
+    posts = {db.get_post(i)["angle"]: db.get_post(i) for i in ids}
+    li, script, blog = posts["linkedin_post"], posts["video_script"], posts["blog_post"]
+    assert li["kind"] == "social" and li["status"] == "pending" and "#AWS #Cloud" in li["body"]
+    assert li["meta"]["campaign"] == "Cloud costs" and li["scheduled_at"] == f"{start}T09:00:00"
+    assert script["kind"] == "draft" and script["targets"] == []
+    assert blog["kind"] == "blog" and blog["targets"] == ["markdown"]
+    assert pipeline.approve(cfg, script["id"]) == "ready"
+    assert pipeline.approve(cfg, li["id"]) == "scheduled"
+
+    new = content.repurpose(cfg, blog["id"], ["x_thread", "linkedin_post"])
+    thread, li2 = db.get_post(new[0]), db.get_post(new[1])
+    assert thread["kind"] == "draft", "thread with no connected platform becomes a draft"
+    assert li2["kind"] == "social" and li2["targets"] == ["linkedin"] and li2["meta"]["repurposed_from"] == blog["id"]
+    db.delete_campaign(cid)
+    assert db.get_campaign(cid) is None and db.list_calendar(cid) == []
 
 
 def test_personas():

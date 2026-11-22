@@ -25,6 +25,13 @@ It reads every file (images and PDFs), writes LinkedIn posts in your voice, and 
 as one multi-image post or as a series (e.g. one a day) after your approval.
 See [docs/FOLDER_POSTS.md](docs/FOLDER_POSTS.md).
 
+### 📣 Marketing agent
+Give it a goal, audience and offer. It plans a strategy (positioning, content pillars, KPIs)
+and a dated content calendar across LinkedIn posts, X threads, Instagram captions, blog
+articles, short-video scripts and newsletters, then writes each piece before it's due.
+**♻️ Repurpose** turns any post into versions for other formats.
+See [docs/MARKETING.md](docs/MARKETING.md).
+
 ### Video → post (YouTube, LinkedIn)
 Give it a video or a folder of videos. It watches sample frames (and the transcript), writes
 the YouTube title, description, tags and chapters plus a LinkedIn caption, and uploads after
@@ -140,6 +147,7 @@ open `http://<host>:8787/?token=<your token>`.
 | [Connections](docs/CONNECTIONS.md) | LinkedIn official login, API keys |
 | [Folder → post](docs/FOLDER_POSTS.md) | Turning certificates/screenshots/photos into posts |
 | [Video → post](docs/VIDEO_POSTS.md) | YouTube/LinkedIn video uploads with AI-written metadata |
+| [Marketing agent](docs/MARKETING.md) | Campaign strategy, content calendar, repurposing |
 | [Contributing](CONTRIBUTING.md) | Dev setup, tests, guidelines, releases |
 | [Changelog](CHANGELOG.md) | What changed in each version |
 

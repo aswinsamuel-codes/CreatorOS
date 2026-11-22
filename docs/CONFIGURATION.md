@@ -160,6 +160,17 @@ publish:
 
 See [PUBLISHERS.md](PUBLISHERS.md).
 
+## Marketing agent
+
+```yaml
+marketing:
+  lead_hours: 24        # write calendar pieces this many hours before they're due
+  best_times: { linkedin_post: "09:00", x_thread: "12:30", instagram_caption: "18:00",
+                blog_post: "10:00", video_script: "15:00", newsletter: "08:00" }
+```
+
+See [MARKETING.md](MARKETING.md).
+
 ## Dashboard
 
 ```yaml

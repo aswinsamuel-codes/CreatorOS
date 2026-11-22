@@ -30,7 +30,7 @@ LOCAL_CONFIG = ROOT / "config.local.yaml"
 
 # Sections the dashboard is allowed to change (secrets always stay in .env).
 EDITABLE_SECTIONS = ("models", "providers", "blog", "approval", "publish", "dashboard", "timezone", "paused",
-                     "persona")
+                     "persona", "marketing")
 
 
 def deep_merge(base: dict, override: dict) -> dict:

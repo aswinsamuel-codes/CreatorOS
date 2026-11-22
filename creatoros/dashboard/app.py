@@ -3,6 +3,7 @@
 import os
 import re
 import threading
+from datetime import datetime, timedelta
 from pathlib import Path
 from urllib.parse import quote
 
@@ -11,6 +12,9 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from .. import __version__, connections, db, documents, notify, scheduler
+from ..modules.marketing import content as marketing_content
+from ..modules.marketing import planner
+from ..modules.marketing.formats import FORMATS, format_list
 from ..modules.social import folder as folder_mod
 from ..modules.video import posting, videoinfo
 from ..personas import list_personas
@@ -291,6 +295,117 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
     def oauth_disconnect(platform: str):
         _oauth(platform).disconnect()
         return {"ok": True}
+
+    # ----------------------------------------------------------- marketing
+    @app.get("/api/marketing/formats")
+    def marketing_formats():
+        return {"formats": format_list(),
+                "targets": [{"id": t, "name": n} for t, n in
+                            [("linkedin", "LinkedIn"), ("medium", "Medium"), ("devto", "dev.to"), ("markdown", "Markdown file")] +
+                            [(f"custom:{cid}", s["name"]) for cid, s in connections.list_custom().items()]]}
+
+    @app.get("/api/campaigns")
+    def campaigns_list():
+        out = []
+        for c in db.list_campaigns():
+            items = db.list_calendar(c["id"])
+            out.append({**c, "total": len(items), "done": sum(i["status"] == "drafted" for i in items)})
+        return out
+
+    @app.post("/api/campaigns")
+    def campaigns_create(data: dict = Body(...)):
+        if not (data.get("goal") or "").strip():
+            raise HTTPException(400, "Describe the campaign goal")
+        formats = [f for f in data.get("formats") or [] if f in FORMATS]
+        if not formats:
+            raise HTTPException(400, "Pick at least one content format")
+        targets = {f: [t for t in ts if is_target(t)] for f, ts in (data.get("targets") or {}).items() if f in FORMATS}
+        brief = {k: data.get(k) for k in ("goal", "audience", "message", "links", "notes", "start", "weeks",
+                                           "per_week", "role", "custom_role")}
+        brief.update(formats=formats, targets=targets)
+        cid = db.create_campaign((data.get("name") or data["goal"])[:80], brief)
+        _bg(planner.plan_campaign, cfg, cid)
+        return {"ok": True, "id": cid, "message": "Planning your campaign (about 1 minute)…"}
+
+    def _campaign(cid: int) -> dict:
+        c = db.get_campaign(cid)
+        if not c:
+            raise HTTPException(404, "campaign not found")
+        return c
+
+    @app.get("/api/campaigns/{cid}")
+    def campaign_get(cid: int):
+        return {**_campaign(cid), "calendar": db.list_calendar(cid)}
+
+    @app.post("/api/campaigns/{cid}/status")
+    def campaign_status(cid: int, data: dict = Body(...)):
+        _campaign(cid)
+        if data.get("status") not in ("active", "paused"):
+            raise HTTPException(400, "status must be active or paused")
+        db.update_campaign(cid, status=data["status"])
+        return {"ok": True}
+
+    @app.delete("/api/campaigns/{cid}")
+    def campaign_delete(cid: int):
+        _campaign(cid)
+        db.delete_campaign(cid)
+        return {"ok": True}
+
+    @app.post("/api/campaigns/{cid}/write-week")
+    def campaign_write_week(cid: int):
+        _campaign(cid)
+        horizon = (datetime.now() + timedelta(days=7)).isoformat(timespec="seconds")
+        items = [i for i in db.list_calendar(cid) if i["status"] in ("planned", "failed") and i["due"] <= horizon]
+
+        def run():
+            for i in items:
+                try:
+                    marketing_content.write_item(cfg, i["id"])
+                except Exception:
+                    pass
+        _bg(run)
+        return {"ok": True, "message": f"Writing {len(items)} piece(s) for the next 7 days…"}
+
+    def _item(item_id: int) -> dict:
+        i = db.get_calendar_item(item_id)
+        if not i:
+            raise HTTPException(404, "item not found")
+        return i
+
+    @app.post("/api/calendar/{item_id}/write")
+    def calendar_write(item_id: int):
+        _item(item_id)
+        _bg(marketing_content.write_item, cfg, item_id)
+        return {"ok": True, "message": "Writing…"}
+
+    @app.post("/api/calendar/{item_id}/skip")
+    def calendar_skip(item_id: int):
+        _item(item_id)
+        db.update_calendar_item(item_id, status="skipped")
+        return {"ok": True}
+
+    @app.put("/api/calendar/{item_id}")
+    def calendar_update(item_id: int, data: dict = Body(...)):
+        _item(item_id)
+        fields = {k: str(data[k])[:300] for k in ("topic", "hook", "cta", "pillar") if k in data}
+        if data.get("due"):
+            try:
+                fields["due"] = datetime.fromisoformat(data["due"]).isoformat(timespec="seconds")
+            except ValueError:
+                raise HTTPException(400, "Invalid date/time")
+        if data.get("status") == "planned":
+            fields["status"] = "planned"
+        db.update_calendar_item(item_id, **fields)
+        return {"ok": True}
+
+    @app.post("/api/posts/{post_id}/repurpose")
+    def post_repurpose(post_id: int, data: dict = Body(...)):
+        _post(post_id)
+        formats = [f for f in data.get("formats") or [] if f in FORMATS]
+        if not formats:
+            raise HTTPException(400, "Pick at least one format")
+        _bg(marketing_content.repurpose, cfg, post_id, formats, data.get("targets"), data.get("instructions", ""))
+        return {"ok": True, "message": f"Creating {len(formats)} new version(s)…"}
 
     # --------------------------------------------------------------- video
     @app.post("/api/video/scan")

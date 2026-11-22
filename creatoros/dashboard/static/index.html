@@ -58,7 +58,11 @@
   .steps li::before { content:counter(s); position:absolute; left:8px; top:7px; width:28px; height:28px; border:2px solid var(--ink); background:var(--yellow);
                       font:400 14px "Archivo Black", sans-serif; display:flex; align-items:center; justify-content:center; }
   .steps a { color:var(--ink); background:var(--blue); font-weight:700; text-decoration:none; padding:0 4px; border:1px solid var(--ink); margin-left:4px; white-space:nowrap; }
-  .s-scheduled { background:var(--purple); }
+  .s-scheduled { background:var(--purple); } .s-ready, .s-drafted, .s-active { background:var(--lime); }
+  .s-planned, .s-planning, .s-writing { background:var(--blue); } .s-skipped, .s-paused { background:#ddd; }
+  .fmt-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:6px 0; border-bottom:2px dashed #ccc; }
+  .fmt-row label { margin:0; flex:1 1 180px; } .fmt-row select { flex:0 1 190px; width:auto; }
+  .cal td { font-size:14px; } .cal input[type=datetime-local] { width:190px; font-size:13px; padding:4px; }
   .thumbs { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
   .thumbs img { width:140px; height:100px; object-fit:cover; border:var(--b); box-shadow:var(--shadow-sm); background:#fff; }
   .chip { font:600 13px "Space Grotesk", sans-serif; background:var(--white); border:2px solid var(--ink); padding:3px 10px; cursor:pointer; }
@@ -107,6 +111,7 @@
   <nav>
     <button data-tab="posts" class="active">📝 Posts</button>
     <button data-tab="write">⚡ Write now</button>
+    <button data-tab="marketing">📣 Marketing</button>
     <button data-tab="folder">📁 Folder → post</button>
     <button data-tab="video">🎬 Video → post</button>
     <button data-tab="connections">🔌 Connections</button>
@@ -134,6 +139,33 @@
       <input id="topic" placeholder="e.g. AI agents in healthcare - or leave empty for today's best story">
       <div class="row"><button class="btn green" onclick="generate()">⚡ Write it</button></div>
       <p class="hint">Takes 1-3 minutes. The post appears in Posts and on Telegram.</p>
+    </div>
+  </section>
+
+  <!-- MARKETING -->
+  <section id="marketing" class="tab">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <div class="tag-title bg-orange">📣 New campaign</div>
+          <p class="hint">Tell the agent what you want to achieve. It plans a strategy and a content calendar, then writes each piece
+            before it's due (and asks for your approval, as always).</p>
+          <label>Goal</label><textarea id="mGoal" style="min-height:70px;font-family:inherit;font-size:15px" placeholder="e.g. Grow my LinkedIn audience as a cloud engineer and get 3 freelance leads"></textarea>
+          <label>Audience</label><input id="mAudience" placeholder="e.g. startup founders and CTOs in India">
+          <label>Key message / offer (optional)</label><input id="mMessage" placeholder="e.g. I help startups cut AWS costs">
+          <label>Links to promote (optional)</label><input id="mLinks" placeholder="e.g. github.com/me, mysite.com/book-a-call">
+          <label>Formats and where they go</label><div id="mFormats"></div>
+          <div class="row"><div class="grow"><label>Start</label><input id="mStart" type="date"></div>
+            <div><label>Weeks</label><select id="mWeeks"></select></div>
+            <div><label>Pieces / week</label><input id="mPerWeek" type="number" min="1" max="21" value="5" style="width:90px"></div></div>
+          <label>Agent role</label><select id="mRole"></select>
+          <label>Campaign name (optional)</label><input id="mName" placeholder="e.g. Cloud freelancing - December">
+          <label>Anything else? (optional)</label><input id="mNotes" placeholder="e.g. launching my course on Dec 15, mention it in the last week">
+          <div class="row"><button class="btn green" onclick="createCampaign()">🧠 Plan my campaign</button></div>
+        </div>
+        <div class="card list" id="campList"></div>
+      </div>
+      <div class="card" id="campView"><h2>Your campaigns 👈</h2><p>Create one, or pick an existing campaign to see its strategy and calendar.</p></div>
     </div>
   </section>
 
@@ -212,7 +244,6 @@
       <p class="hint">Click a platform to connect it - each one has simple step-by-step instructions. No coding or files needed.
         LinkedIn and YouTube use their official login pages, so CreatorOS never sees your passwords. Everything is stored only on this computer.</p></div>
     <div class="tiles" id="connGrid"></div>
-    <div class="modal-bg" id="modalBg" onclick="if (event.target === this) closeModal()"><div class="modal" id="modal"></div></div>
   </section>
 
   <!-- PROFILE -->
@@ -328,6 +359,7 @@
   <!-- STATUS -->
   <section id="status" class="tab"><div class="card" id="statusView"></div></section>
 </main>
+<div class="modal-bg" id="modalBg" onclick="if (event.target === this) closeModal()"><div class="modal" id="modal"></div></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -350,7 +382,8 @@ async function safe(fn) { try { await fn(); } catch (e) { toast(e.message, true)
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav button, .tab").forEach(x => x.classList.remove("active"));
   b.classList.add("active"); $(b.dataset.tab).classList.add("active");
-  ({ profile: loadProfile, status: loadStatus, settings: loadSettings, folder: loadFolder, video: loadVideo, connections: loadConnections })[b.dataset.tab]?.();
+  ({ profile: loadProfile, status: loadStatus, settings: loadSettings, folder: loadFolder, video: loadVideo,
+     connections: loadConnections, marketing: loadMarketing })[b.dataset.tab]?.();
 });
 function openTab(name) { document.querySelector(`nav button[data-tab=${name}]`).click(); }
 
@@ -388,6 +421,98 @@ const runFolder = () => safe(async () => {
   if (!body.targets.length) return toast("Choose where to post", true);
   const r = await api("/api/folder/run", "POST", body);
   toast(r.message); setTimeout(() => { openTab("posts"); }, 4000);
+});
+
+/* ---------------- marketing ---------------- */
+let MK = null, CAMP = null, campTimer = null;
+async function loadMarketing() {
+  if (!MK) MK = await api("/api/marketing/formats");
+  const ps = await loadPersonas();
+  if (!$("mFormats").innerHTML) {
+    const opts = f => `<option value="">${f.default_targets === null ? "Blog sites from Settings" : (f.default_targets || []).length ? "Recommended: " + f.default_targets.join(", ") : "Draft for me (don't publish)"}</option>`
+      + `<option value="__none">Draft for me (don't publish)</option>` + MK.targets.map(t => `<option value="${esc(t.id)}">Post to ${esc(t.name)}</option>`).join("");
+    $("mFormats").innerHTML = MK.formats.map(f => `<div class="fmt-row"><label class="switch"><input type="checkbox" class="m-f" value="${f.id}" ${["linkedin_post", "video_script"].includes(f.id) ? "checked" : ""}> ${esc(f.label)}</label>
+      <select class="m-t" data-f="${f.id}">${opts(f)}</select></div>`).join("");
+    $("mWeeks").innerHTML = [1, 2, 3, 4, 6, 8].map(w => `<option ${w === 2 ? "selected" : ""}>${w}</option>`).join("");
+    const t = new Date(Date.now() + 86400000); $("mStart").value = t.toISOString().slice(0, 10);
+    $("mRole").innerHTML = ps.filter(p => p.id !== "custom").map(p => `<option value="${p.id}" ${p.id === "marketing_strategist" ? "selected" : ""}>${esc(p.label)}</option>`).join("");
+  }
+  loadCampaigns();
+}
+async function loadCampaigns() {
+  const list = await api("/api/campaigns");
+  $("campList").innerHTML = list.map(c => `<div class="item ${CAMP === c.id ? "sel" : ""}" onclick="openCampaign(${c.id})">
+      <div class="t">${esc(c.name)}</div><div class="m"><span class="badge s-${c.status}">${c.status}</span> ${c.done}/${c.total} written · ${esc(c.created_at.slice(0, 10))}</div></div>`).join("")
+    || `<div class="empty">No campaigns yet.</div>`;
+}
+const createCampaign = () => safe(async () => {
+  const formats = [...document.querySelectorAll(".m-f:checked")].map(i => i.value);
+  const targets = {};
+  document.querySelectorAll(".m-t").forEach(s => { if (s.value === "__none") targets[s.dataset.f] = []; else if (s.value) targets[s.dataset.f] = [s.value]; });
+  const r = await api("/api/campaigns", "POST", {
+    goal: $("mGoal").value.trim(), audience: $("mAudience").value.trim(), message: $("mMessage").value.trim(), links: $("mLinks").value.trim(),
+    notes: $("mNotes").value.trim(), name: $("mName").value.trim(), formats, targets, start: $("mStart").value,
+    weeks: +$("mWeeks").value, per_week: +$("mPerWeek").value, role: $("mRole").value });
+  toast(r.message); openCampaign(r.id);
+});
+async function openCampaign(id) {
+  CAMP = id; clearTimeout(campTimer); loadCampaigns();
+  const c = await api(`/api/campaigns/${id}`), s = c.strategy || {};
+  const fmtLabel = f => (MK?.formats.find(x => x.id === f) || {}).label || f;
+  if (c.status === "planning") campTimer = setTimeout(() => openCampaign(id), 5000);
+  const rows = c.calendar.map(i => `<tr>
+      <td><input type="datetime-local" value="${esc(i.due.slice(0, 16))}" onchange="updItem(${i.id}, {due: this.value})" ${i.status === "drafted" ? "disabled" : ""}></td>
+      <td><span class="badge bg-yellow">${esc(fmtLabel(i.format))}</span><div class="hint">${esc(i.pillar)}</div></td>
+      <td><b>${esc(i.topic)}</b>${i.hook ? `<div class="hint">🪝 ${esc(i.hook)}</div>` : ""}${(i.targets || []).length ? `<div class="hint">→ ${esc(i.targets.join(", "))}</div>` : `<div class="hint">→ draft for you</div>`}</td>
+      <td><span class="badge s-${i.status}">${i.status}</span></td>
+      <td style="white-space:nowrap">${i.post_id ? `<button class="btn white sm" onclick="openTab('posts'); openPost(${i.post_id})">Open</button>`
+        : i.status === "skipped" ? `<button class="btn white sm" onclick="updItem(${i.id}, {status: 'planned'})">Undo</button>`
+        : `<button class="btn green sm" onclick="writeItem(${i.id})" ${i.status === "writing" ? "disabled" : ""}>Write now</button>
+           <button class="btn white sm" onclick="editItem(${i.id})">✏️</button> <button class="btn red sm" onclick="skipItem(${i.id})">Skip</button>`}</td></tr>`).join("");
+  $("campView").innerHTML = `
+    <div class="row" style="justify-content:space-between;margin-top:0"><h2 style="margin:0">${esc(c.name)}</h2><span class="badge s-${c.status}">${c.status}</span></div>
+    <p class="hint">${esc(c.brief.goal || "")}</p>
+    ${c.status === "planning" ? `<h3>🧠 Planning your strategy and calendar…</h3><p>This takes about a minute. The page updates automatically.</p>` : ""}
+    ${c.status === "failed" ? `<p class="badge s-failed">Planning failed: ${esc(s.error || "")}</p>` : ""}
+    ${c.status === "active" || c.status === "paused" ? `<div class="row">
+      <button class="btn green" onclick="writeWeek(${id})">✍️ Write next 7 days now</button>
+      <button class="btn white" onclick="campStatus(${id}, '${c.status === "active" ? "paused" : "active"}')">${c.status === "active" ? "⏸ Pause campaign" : "▶️ Resume campaign"}</button>
+      <button class="btn red" onclick="delCampaign(${id})">🗑️ Delete</button></div>
+      <p class="hint">While active, each piece is written automatically ${esc(String(24))} hours before its time (Settings → Advanced: marketing.lead_hours).</p>` : ""}
+    ${s.positioning ? `<h3>🎯 Positioning</h3><p>${esc(s.positioning)}</p>` : ""}
+    ${(s.pillars || []).length ? `<h3>🏛️ Content pillars</h3><div class="row">${s.pillars.map(p => `<span class="badge bg-blue" title="${esc(p.description)}">${esc(p.name)}</span>`).join("")}</div>` : ""}
+    ${(s.audience_insights || []).length ? `<h3>👥 Audience insights</h3><ul>${s.audience_insights.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${(s.kpis || []).length ? `<h3>📈 KPIs</h3><ul>${s.kpis.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${(s.tips || []).length ? `<h3>💡 Tips</h3><ul>${s.tips.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    ${rows ? `<h3>🗓️ Content calendar (${c.calendar.length})</h3><table class="cal"><tr><th>When</th><th>Format</th><th>Topic</th><th>Status</th><th></th></tr>${rows}</table>` : ""}`;
+}
+const updItem = (id, data) => safe(async () => { await api(`/api/calendar/${id}`, "PUT", data); toast("Updated"); openCampaign(CAMP); });
+const editItem = id => safe(async () => {
+  const topic = prompt("Topic for this piece:"); if (topic === null) return;
+  const hook = prompt("Hook / opening idea (optional):") ?? "";
+  await api(`/api/calendar/${id}`, "PUT", { topic, hook }); openCampaign(CAMP);
+});
+const writeItem = id => safe(async () => { const r = await api(`/api/calendar/${id}/write`, "POST"); toast(r.message + " (about 30 s)"); setTimeout(() => openCampaign(CAMP), 1500); setTimeout(() => openCampaign(CAMP), 40000); });
+const skipItem = id => safe(async () => { await api(`/api/calendar/${id}/skip`, "POST"); openCampaign(CAMP); });
+const writeWeek = id => safe(async () => { const r = await api(`/api/campaigns/${id}/write-week`, "POST"); toast(r.message); setTimeout(() => openCampaign(id), 2000); });
+const campStatus = (id, status) => safe(async () => { await api(`/api/campaigns/${id}/status`, "POST", { status }); openCampaign(id); });
+const delCampaign = id => safe(async () => { if (confirm("Delete this campaign and its calendar? (Posts already written stay in Posts.)")) { await api(`/api/campaigns/${id}`, "DELETE"); CAMP = null; $("campView").innerHTML = "<h2>Deleted</h2>"; loadCampaigns(); } });
+
+/* repurpose */
+async function openRepurpose(postId) {
+  if (!MK) MK = await api("/api/marketing/formats");
+  openModal(`<h2 style="margin-top:0">♻️ Repurpose post #${postId}</h2>
+    <p class="hint">Turn this post into new versions for other platforms. Each one becomes a new post for your approval.</p>
+    ${MK.formats.map(f => `<label class="switch"><input type="checkbox" class="r-f" value="${f.id}"> ${esc(f.label)}</label>`).join("")}
+    <label>Note for the writer (optional)</label><input id="rNote" placeholder="e.g. make the thread more opinionated">
+    <div class="row"><button class="btn green" onclick="doRepurpose(${postId})">♻️ Create versions</button></div>`);
+}
+const doRepurpose = id => safe(async () => {
+  const formats = [...document.querySelectorAll(".r-f:checked")].map(i => i.value);
+  if (!formats.length) return toast("Pick at least one format", true);
+  const r = await api(`/api/posts/${id}/repurpose`, "POST", { formats, instructions: $("rNote").value });
+  $("modalBg").classList.remove("open"); toast(r.message + " They'll appear in Posts.");
+  setTimeout(loadPosts, 30000);
 });
 
 /* ---------------- video -> post ---------------- */
@@ -441,7 +566,7 @@ async function loadConnections() {
     `<div class="tile add" onclick="openCustom()"><div class="logo-c">＋</div><div class="name">Add a platform</div><div class="grp">Any app with an API or webhook</div><span class="badge bg-white">add</span></div>`;
 }
 function openModal(html) { $("modal").innerHTML = `<button class="btn white sm x" onclick="closeModal()">✕</button>` + html; $("modalBg").classList.add("open"); }
-function closeModal() { $("modalBg").classList.remove("open"); loadConnections(); }
+function closeModal() { $("modalBg").classList.remove("open"); if ($("connections").classList.contains("active")) loadConnections(); }
 function stepsHtml(steps) {
   return `<ol class="steps">${steps.map(([text, link]) => `<li>${esc(text)}${link ? ` <a href="${esc(link)}" target="_blank" rel="noopener">open ↗</a>` : ""}</li>`).join("")}</ol>`;
 }
@@ -534,18 +659,25 @@ async function openPost(id) {
   current = id; loadPosts();
   const p = await api(`/api/posts/${id}`);
   const links = Object.entries(p.published || {}).map(([k, v]) => `<div><b>${esc(k)}:</b> <a href="${esc(v)}" target="_blank">${esc(v)}</a></div>`).join("");
-  const social = p.kind === "social", video = p.kind === "video", meta = p.meta || {};
+  const video = p.kind === "video", draft = p.kind === "draft", social = p.kind === "social" || draft, meta = p.meta || {};
   const thumbs = (p.media || []).map(m => `<img src="/api/media?path=${encodeURIComponent(m.thumb || m.path)}" alt="${esc(m.alt)}" title="${esc(m.alt)}">`).join("");
   const when = p.scheduled_at ? `<span class="badge bg-purple">🗓️ ${esc(p.scheduled_at.replace("T", " "))}</span>` : "";
   const to = (p.targets || []).length ? `<span class="badge bg-blue">→ ${esc(p.targets.join(", "))}</span>` : "";
   $("postView").innerHTML = `
-    <div class="row"><span class="badge s-${p.status}">${p.status}</span>${to}${when}<span>${esc(p.angle)} · ${esc(p.topic)}</span></div>
+    <div class="row"><span class="badge s-${p.status}">${p.status}</span>${to}${when}
+      ${meta.format_label ? `<span class="badge bg-yellow">${esc(meta.format_label)}</span>` : ""}
+      ${meta.campaign ? `<span class="badge bg-orange">📣 ${esc(meta.campaign)}</span>` : ""}
+      <span>${esc(p.angle)} · ${esc(p.topic)}</span></div>
+    ${draft ? `<p class="hint">📝 This is a draft for you to use (record, send or post yourself) - nothing is published automatically.</p>` : ""}
     ${p.error ? `<p class="badge s-failed">${esc(p.error)}</p>` : ""}${links}
     ${thumbs ? `<div class="thumbs">${thumbs}</div>` : ""}
     <div class="row">
-      <button class="btn green" onclick="act('approve')">✅ Approve${p.scheduled_at && new Date(p.scheduled_at) > new Date() ? " (on schedule)" : " & publish"}</button>
+      ${draft ? `<button class="btn green" onclick="act('approve')">✔ Mark ready</button>
+                 <button class="btn white" onclick="navigator.clipboard.writeText(${esc(JSON.stringify(p.body))}); toast('Copied')">📋 Copy</button>`
+        : `<button class="btn green" onclick="act('approve')">✅ Approve${p.scheduled_at && new Date(p.scheduled_at) > new Date() ? " (on schedule)" : " & publish"}</button>`}
       ${p.status === "scheduled" ? `<button class="btn yellow" onclick="act('publish')">⚡ Publish now</button>` : ""}
       <button class="btn white" onclick="toggleEdit()">✏️ Edit text</button>
+      <button class="btn yellow" onclick="openRepurpose(${p.id})">♻️ Repurpose</button>
       <button class="btn red" onclick="act('reject')">❌ Skip</button>
     </div>
     <div class="row"><input class="grow" id="instr" placeholder="Ask the AI to change it, e.g. 'more casual, add an example'"><button class="btn pink" onclick="revise()">🔁 Rewrite</button></div>
@@ -574,7 +706,7 @@ function toggleEdit() { const b = $("editBox"); b.style.display = b.style.displa
 const act = what => safe(async () => {
   if (what === "publish" && !confirm("Publish this post right now?")) return;
   const r = await api(`/api/posts/${current}/${what}`, "POST");
-  toast({ approve: r.status === "scheduled" ? "Approved - it will publish on schedule" : "Published - check the links",
+  toast({ approve: r.status === "scheduled" ? "Approved - it will publish on schedule" : r.status === "ready" ? "Marked ready ✔" : "Published - check the links",
           publish: "Published - check the links", reject: "Skipped" }[what]);
   openPost(current);
 });

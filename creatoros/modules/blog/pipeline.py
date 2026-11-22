@@ -82,6 +82,9 @@ def approve(cfg: dict, post_id: int) -> str:
     post = db.get_post(post_id)
     if not post:
         raise ValueError(f"Post #{post_id} not found")
+    if post.get("kind") == "draft":  # scripts/newsletters: nothing to publish, just mark as ready to use
+        db.update_post(post_id, status="ready")
+        return "ready"
     when = post.get("scheduled_at")
     if when and datetime.fromisoformat(when) > datetime.now():
         db.update_post(post_id, status="scheduled")
@@ -104,6 +107,9 @@ def publish_post(cfg: dict, post_id: int) -> dict:
     post = db.get_post(post_id)
     if not post:
         raise ValueError(f"Post #{post_id} not found")
+    if post.get("kind") == "draft":
+        db.update_post(post_id, status="ready")
+        return {}
     results, errors = dict(post.get("published") or {}), []
     targets = post.get("targets") or cfg.get("publish", {}).get("targets", ["markdown"])
     for target in targets:
@@ -126,7 +132,7 @@ def revise(cfg: dict, post_id: int, instructions: str) -> None:
     if post.get("kind") == "video":
         from ..video import posting
         new = posting.revise(get_llm(cfg, "writer"), post, instructions, author_context(cfg))
-    elif post.get("kind") == "social":
+    elif post.get("kind") in ("social", "draft"):
         from ..social import folder
         new = folder.revise(get_llm(cfg, "writer"), post, instructions, author_context(cfg))
     else:

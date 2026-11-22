@@ -41,6 +41,14 @@ def _publish_due(cfg: dict) -> None:
         log.exception("Publishing scheduled posts failed")
 
 
+def _marketing(cfg: dict) -> None:
+    try:
+        from .modules.marketing import content
+        content.generate_due(cfg)
+    except Exception:
+        log.exception("Marketing content generation failed")
+
+
 def _add_slots(sched: BackgroundScheduler, cfg: dict) -> None:
     tz = cfg.get("timezone") or None
     for i, slot in enumerate(cfg["blog"].get("schedule", [])):
@@ -58,6 +66,8 @@ def start(cfg: dict) -> BackgroundScheduler:
     _add_slots(sched, cfg)
     sched.add_job(_auto_publish, "interval", minutes=5, args=[cfg], id="auto-publish")
     sched.add_job(_publish_due, "interval", minutes=2, args=[cfg], id="publish-due")
+    sched.add_job(_marketing, "interval", minutes=30, args=[cfg], id="marketing",
+                  next_run_time=datetime.now() + timedelta(minutes=1))
     sched.start()
     for run in next_runs(sched):
         log.info("Scheduled %s (%s) -> next run %s", run["time"], run["angle"], run["next"])

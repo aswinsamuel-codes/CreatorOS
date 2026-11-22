@@ -34,6 +34,17 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE TABLE IF NOT EXISTS seen (
     key TEXT PRIMARY KEY, title TEXT, used_at TEXT
 );
+CREATE TABLE IF NOT EXISTS campaigns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT, name TEXT, brief TEXT, strategy TEXT,
+    status TEXT            -- planning | active | paused | failed
+);
+CREATE TABLE IF NOT EXISTS calendar (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    campaign_id INTEGER, due TEXT, format TEXT, pillar TEXT, topic TEXT, hook TEXT, cta TEXT,
+    targets TEXT, post_id INTEGER,
+    status TEXT            -- planned | writing | drafted | skipped | failed
+);
 """
 
 
@@ -112,6 +123,85 @@ def list_posts(limit: int = 50, status: str | None = None) -> list[dict]:
     q += " ORDER BY id DESC LIMIT ?"
     with _lock, _connect() as c:
         return [_decode(r) for r in c.execute(q, [*args, limit]).fetchall()]
+
+
+# ------------------------------------------------------------- campaigns
+def _row(r: sqlite3.Row | None, json_keys: tuple) -> dict | None:
+    if r is None:
+        return None
+    d = dict(r)
+    for k in json_keys:
+        d[k] = json.loads(d[k]) if d.get(k) else ([] if k == "targets" else {})
+    return d
+
+
+def create_campaign(name: str, brief: dict) -> int:
+    with _lock, _connect() as c:
+        return c.execute("INSERT INTO campaigns (created_at, name, brief, strategy, status) VALUES (?, ?, ?, ?, ?)",
+                         (_now(), name, json.dumps(brief, ensure_ascii=False), "{}", "planning")).lastrowid
+
+
+def update_campaign(cid: int, **fields) -> None:
+    for k in ("brief", "strategy"):
+        if k in fields and not isinstance(fields[k], str):
+            fields[k] = json.dumps(fields[k], ensure_ascii=False)
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    with _lock, _connect() as c:
+        c.execute(f"UPDATE campaigns SET {sets} WHERE id = ?", [*fields.values(), cid])
+
+
+def get_campaign(cid: int) -> dict | None:
+    with _lock, _connect() as c:
+        return _row(c.execute("SELECT * FROM campaigns WHERE id = ?", (cid,)).fetchone(), ("brief", "strategy"))
+
+
+def list_campaigns() -> list[dict]:
+    with _lock, _connect() as c:
+        return [_row(r, ("brief", "strategy")) for r in c.execute("SELECT * FROM campaigns ORDER BY id DESC")]
+
+
+def delete_campaign(cid: int) -> None:
+    with _lock, _connect() as c:
+        c.execute("DELETE FROM calendar WHERE campaign_id = ?", (cid,))
+        c.execute("DELETE FROM campaigns WHERE id = ?", (cid,))
+
+
+def add_calendar_item(campaign_id: int, **item) -> int:
+    item = {**item, "campaign_id": campaign_id, "status": item.get("status", "planned"),
+            "targets": json.dumps(item.get("targets") or [])}
+    cols = ", ".join(item)
+    with _lock, _connect() as c:
+        return c.execute(f"INSERT INTO calendar ({cols}) VALUES ({', '.join('?' for _ in item)})",
+                         list(item.values())).lastrowid
+
+
+def update_calendar_item(item_id: int, **fields) -> None:
+    if "targets" in fields and not isinstance(fields["targets"], str):
+        fields["targets"] = json.dumps(fields["targets"])
+    sets = ", ".join(f"{k} = ?" for k in fields)
+    with _lock, _connect() as c:
+        c.execute(f"UPDATE calendar SET {sets} WHERE id = ?", [*fields.values(), item_id])
+
+
+def get_calendar_item(item_id: int) -> dict | None:
+    with _lock, _connect() as c:
+        return _row(c.execute("SELECT * FROM calendar WHERE id = ?", (item_id,)).fetchone(), ("targets",))
+
+
+def list_calendar(campaign_id: int) -> list[dict]:
+    with _lock, _connect() as c:
+        rows = c.execute("SELECT * FROM calendar WHERE campaign_id = ? ORDER BY due", (campaign_id,)).fetchall()
+    return [_row(r, ("targets",)) for r in rows]
+
+
+def calendar_due(before_iso: str) -> list[dict]:
+    """Planned items of active campaigns that are due before the given time."""
+    with _lock, _connect() as c:
+        rows = c.execute(
+            "SELECT calendar.* FROM calendar JOIN campaigns ON campaigns.id = calendar.campaign_id "
+            "WHERE calendar.status = 'planned' AND campaigns.status = 'active' AND calendar.due <= ? "
+            "ORDER BY calendar.due", (before_iso,)).fetchall()
+    return [_row(r, ("targets",)) for r in rows]
 
 
 def recent_titles(n: int = 30) -> list[str]:

@@ -112,6 +112,21 @@ publish:
   # Category ids: 28 Science & Technology, 27 Education, 22 People & Blogs, 24 Entertainment, 20 Gaming
   youtube: { privacy: private, category_id: "28", upload_thumbnail: true }
 
+# ---------------------------------------------------------------------------
+# Marketing agent
+#   lead_hours: write each calendar piece this many hours before it's due
+#   best_times: default posting time per format (general starting points; tune for your audience)
+# ---------------------------------------------------------------------------
+marketing:
+  lead_hours: 24
+  best_times:
+    linkedin_post: "09:00"
+    x_thread: "12:30"
+    instagram_caption: "18:00"
+    blog_post: "10:00"
+    video_script: "15:00"
+    newsletter: "08:00"
+
 dashboard:
   host: 127.0.0.1     # use 0.0.0.0 on the lab cluster (and set DASHBOARD_TOKEN in .env)
   port: 8787
