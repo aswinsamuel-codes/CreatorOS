@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [0.6.0] - 2026-11-22
 
 ### Added
 - **Desktop app (Rust + Tauri)** for Windows, macOS and Linux: bundled engine (PyInstaller sidecar),
