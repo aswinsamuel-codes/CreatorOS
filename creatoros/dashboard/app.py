@@ -237,11 +237,19 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
             key = env("ANTHROPIC_API_KEY")
             if not key:
                 raise RuntimeError("Save your API key first")
+            from ..llm import friendly_claude_error
+            client = anthropic.Anthropic(api_key=key)
             try:
-                anthropic.Anthropic(api_key=key).models.retrieve(cfg["models"]["writer"]["model"])
+                # A 1-token request to the cheapest model (a tiny fraction of a cent) also proves the
+                # account has credits, which a key check alone doesn't.
+                client.messages.create(model=cfg["models"]["scout"]["model"] if cfg["models"]["scout"]["provider"] == "claude"
+                                       else "claude-haiku-5-5", max_tokens=1,
+                                       messages=[{"role": "user", "content": "hi"}])
             except anthropic.AuthenticationError:
                 raise RuntimeError("Claude rejected this key - check it was copied completely")
-            return "Claude key works ✔"
+            except anthropic.APIStatusError as e:
+                raise RuntimeError(friendly_claude_error(e.status_code, str(e.message)))
+            return "Claude key works and your account has credits ✔"
         if platform == "telegram":
             from ..notify.telegram import Telegram
             if not env("TELEGRAM_BOT_TOKEN"):

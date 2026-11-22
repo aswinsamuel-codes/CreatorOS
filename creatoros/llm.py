@@ -17,6 +17,18 @@ class LLMError(RuntimeError):
     pass
 
 
+def friendly_claude_error(status: int, message: str) -> str:
+    low = message.lower()
+    if "credit balance" in low or "billing" in low:
+        return ("Your Claude account has no API credits. Add credits at "
+                "https://console.anthropic.com/settings/billing (or switch the writer to a local model in Settings).")
+    if status == 429:
+        return "Claude rate limit reached - CreatorOS will try again on the next run."
+    if status == 529 or status >= 500:
+        return "Claude is temporarily overloaded - try again in a few minutes."
+    return f"Claude API error {status}: {message}"
+
+
 class AnthropicLLM:
     # Models that support server-side refusal fallbacks ("default" routing).
     _FALLBACK_PREFIXES = ("claude-opus-5", "claude-sonnet-5-5", "claude-fable-5")
@@ -58,7 +70,7 @@ class AnthropicLLM:
         except self._anthropic.AuthenticationError as e:
             raise LLMError("Claude API key is missing or invalid (check ANTHROPIC_API_KEY in .env)") from e
         except self._anthropic.APIStatusError as e:
-            raise LLMError(f"Claude API error {e.status_code}: {e.message}") from e
+            raise LLMError(friendly_claude_error(e.status_code, str(e.message))) from e
         except self._anthropic.APIConnectionError as e:
             raise LLMError("Could not reach the Claude API (network problem)") from e
 

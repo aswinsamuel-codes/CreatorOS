@@ -41,8 +41,8 @@ def reddit(subreddits: list[str], limit: int = 15) -> list[dict]:
         try:
             r = requests.get(f"https://www.reddit.com/r/{sub}/top.json?t=day&limit={limit}", headers=UA, timeout=8)
             r.raise_for_status()
-        except requests.ConnectionError as e:
-            log.warning("Reddit unreachable, skipping it this run: %s", e)
+        except (requests.ConnectionError, requests.Timeout):
+            log.warning("Reddit isn't responding from this network - skipping it this run")
             break
         except Exception as e:
             log.warning("Reddit r/%s failed: %s", sub, e)
