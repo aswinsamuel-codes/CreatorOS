@@ -34,6 +34,10 @@ CREATE TABLE IF NOT EXISTS posts (
 CREATE TABLE IF NOT EXISTS seen (
     key TEXT PRIMARY KEY, title TEXT, used_at TEXT
 );
+CREATE TABLE IF NOT EXISTS usage (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ts TEXT, provider TEXT, model TEXT, input_tokens INTEGER, output_tokens INTEGER
+);
 CREATE TABLE IF NOT EXISTS campaigns (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT, name TEXT, brief TEXT, strategy TEXT,
@@ -123,6 +127,21 @@ def list_posts(limit: int = 50, status: str | None = None) -> list[dict]:
     q += " ORDER BY id DESC LIMIT ?"
     with _lock, _connect() as c:
         return [_decode(r) for r in c.execute(q, [*args, limit]).fetchall()]
+
+
+# ----------------------------------------------------------------- usage
+def add_usage(provider: str, model: str, input_tokens: int, output_tokens: int) -> None:
+    with _lock, _connect() as c:
+        c.execute("INSERT INTO usage (ts, provider, model, input_tokens, output_tokens) VALUES (?, ?, ?, ?, ?)",
+                  (_now(), provider, model, int(input_tokens or 0), int(output_tokens or 0)))
+
+
+def usage_summary(since_iso: str) -> dict:
+    """{provider: {"input": n, "output": n, "calls": n}} since the given time."""
+    with _lock, _connect() as c:
+        rows = c.execute("SELECT provider, SUM(input_tokens) i, SUM(output_tokens) o, COUNT(*) n FROM usage "
+                         "WHERE ts >= ? GROUP BY provider", (since_iso,)).fetchall()
+    return {r["provider"]: {"input": r["i"] or 0, "output": r["o"] or 0, "calls": r["n"]} for r in rows}
 
 
 # ------------------------------------------------------------- campaigns

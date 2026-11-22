@@ -17,6 +17,15 @@ class LLMError(RuntimeError):
     pass
 
 
+def record_usage(provider: str, model: str, input_tokens: int, output_tokens: int) -> None:
+    """Count tokens for the dashboard's usage meters (never breaks a request)."""
+    try:
+        from . import db
+        db.add_usage(provider, model, input_tokens, output_tokens)
+    except Exception as e:
+        log.debug("Could not record usage: %s", e)
+
+
 def friendly_claude_error(status: int, message: str) -> str:
     low = message.lower()
     if "credit balance" in low or "billing" in low:
@@ -33,9 +42,10 @@ class AnthropicLLM:
     # Models that support server-side refusal fallbacks ("default" routing).
     _FALLBACK_PREFIXES = ("claude-opus-5", "claude-sonnet-5-5", "claude-fable-5")
 
-    def __init__(self, model: str, api_key: str | None = None, effort: str | None = None):
+    def __init__(self, model: str, api_key: str | None = None, effort: str | None = None, provider: str = "claude"):
         import anthropic
 
+        self.provider = provider
         self._anthropic = anthropic
         self.client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
         self.model = model
@@ -74,6 +84,11 @@ class AnthropicLLM:
         except self._anthropic.APIConnectionError as e:
             raise LLMError("Could not reach the Claude API (network problem)") from e
 
+        u = getattr(msg, "usage", None)
+        if u is not None:
+            inp = (u.input_tokens or 0) + (getattr(u, "cache_creation_input_tokens", 0) or 0) + \
+                  (getattr(u, "cache_read_input_tokens", 0) or 0)
+            record_usage(self.provider, self.model, inp, u.output_tokens or 0)
         if msg.stop_reason == "refusal":
             raise LLMError("The model declined this request")
         text = "".join(b.text for b in msg.content if b.type == "text").strip()
@@ -83,7 +98,8 @@ class AnthropicLLM:
 
 
 class OpenAICompatibleLLM:
-    def __init__(self, model: str, base_url: str, api_key: str | None = None, **_):
+    def __init__(self, model: str, base_url: str, api_key: str | None = None, provider: str = "", **_):
+        self.provider = provider or _provider_name(base_url).lower()
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -99,21 +115,87 @@ class OpenAICompatibleLLM:
             ]
         body = {
             "model": self.model,
-            "max_tokens": max_tokens,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": user_content},
             ],
         }
-        try:
-            r = requests.post(f"{self.base_url}/chat/completions", json=body, headers=headers, timeout=900)
-        except requests.RequestException as e:
-            raise LLMError(f"Could not reach {self.base_url}: {e}") from e
+        # OpenAI's newer models only accept max_completion_tokens; other servers expect max_tokens.
+        length_key = "max_completion_tokens" if "api.openai.com" in self.base_url else "max_tokens"
+        body[length_key] = max_tokens
+        r = self._post(body, headers)
+        if r.status_code == 400 and "max_tokens" in r.text and length_key == "max_tokens":
+            body["max_completion_tokens"] = body.pop("max_tokens")
+            r = self._post(body, headers)
         if r.status_code >= 400:
-            raise LLMError(f"{self.base_url} returned {r.status_code}: {r.text[:300]}")
-        text = r.json()["choices"][0]["message"]["content"] or ""
+            raise LLMError(friendly_http_error(self.base_url, r.status_code, r.text))
+        data = r.json()
+        usage = data.get("usage") or {}
+        record_usage(self.provider, self.model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
+        choice = data["choices"][0]
+        text = (choice.get("message") or {}).get("content") or ""
         # Reasoning models (Qwen, DeepSeek...) may include their thinking inline.
         return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+
+    def _post(self, body: dict, headers: dict) -> requests.Response:
+        try:
+            return requests.post(f"{self.base_url}/chat/completions", json=body, headers=headers, timeout=900)
+        except requests.RequestException as e:
+            raise LLMError(f"Could not reach {self.base_url} - is the server running and reachable? ({e})") from e
+
+
+def _provider_name(base_url: str) -> str:
+    if "openai.com" in base_url:
+        return "OpenAI"
+    if "googleapis.com" in base_url:
+        return "Gemini"
+    return base_url
+
+
+def friendly_http_error(base_url: str, status: int, text: str) -> str:
+    name, low = _provider_name(base_url), text.lower()
+    if status in (401, 403) or "api key not valid" in low or "invalid api key" in low or "incorrect api key" in low:
+        return f"{name} rejected the API key - check it was copied completely (Connections tab)."
+    if "insufficient_quota" in low or "billing" in low or "credit" in low:
+        return f"Your {name} account has no credits or quota left - add billing in your {name} account."
+    if status == 429:
+        return f"{name} rate limit or free-tier daily limit reached - try again later or upgrade your {name} plan."
+    if status == 404 or "model" in low and "not found" in low:
+        return f"{name} doesn't recognise that model name - pick another model on the Connections tab."
+    if status >= 500:
+        return f"{name} is having problems right now - try again in a few minutes."
+    return f"{name} returned {status}: {text[:300]}"
+
+
+CHAT_EXCLUDE = ("embed", "whisper", "tts", "dall-e", "moderation", "image", "audio", "realtime", "transcribe",
+                "search", "computer-use", "aqa", "imagen", "veo", "learnlm", "babbage", "davinci", "codex")
+
+
+def list_models(cfg: dict, provider: str) -> list[str]:
+    """Chat models available to this account, newest-looking first."""
+    prov = cfg["providers"][provider]
+    key = env(prov.get("api_key_env"))
+    if prov["type"] == "anthropic":
+        import anthropic
+        client = anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic()
+        return [m.id for m in client.models.list()]
+    headers = {"Authorization": f"Bearer {key}"} if key else {}
+    r = requests.get(prov["base_url"].rstrip("/") + "/models", headers=headers, timeout=30)
+    if r.status_code >= 400:
+        raise LLMError(friendly_http_error(prov["base_url"], r.status_code, r.text))
+    ids = [m["id"].removeprefix("models/") for m in r.json().get("data", [])]
+    ids = [i for i in ids if not any(x in i.lower() for x in CHAT_EXCLUDE)]
+    return sorted(set(ids), reverse=True)
+
+
+def cheapest(models: list[str]) -> str | None:
+    """Pick a small/cheap model, matching whole name parts ("gemini" must not count as "mini")."""
+    for hint in ("flash-lite", "nano", "mini", "flash", "haiku"):
+        pattern = re.compile(rf"(^|[-_.:/]){re.escape(hint)}($|[-_.:/])")
+        for m in models:
+            if pattern.search(m.lower()):
+                return m
+    return models[0] if models else None
 
 
 def get_llm(cfg: dict, role: str):
@@ -121,9 +203,10 @@ def get_llm(cfg: dict, role: str):
     provider = cfg["providers"][spec["provider"]]
     api_key = env(provider.get("api_key_env"))
     if provider["type"] == "anthropic":
-        return AnthropicLLM(spec["model"], api_key=api_key, effort=spec.get("effort"))
+        return AnthropicLLM(spec["model"], api_key=api_key, effort=spec.get("effort"), provider=spec["provider"])
     if provider["type"] == "openai_compatible":
-        return OpenAICompatibleLLM(spec["model"], base_url=provider["base_url"], api_key=api_key)
+        return OpenAICompatibleLLM(spec["model"], base_url=provider["base_url"], api_key=api_key,
+                                   provider=spec["provider"])
     raise ValueError(f"Unknown provider type: {provider['type']}")
 
 

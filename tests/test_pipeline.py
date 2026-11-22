@@ -466,6 +466,46 @@ def test_marketing_campaign():
     assert db.get_campaign(cid) is None and db.list_calendar(cid) == []
 
 
+def test_ai_providers_and_usage():
+    from datetime import datetime
+
+    from creatoros import llm
+
+    setup()
+    sent = []
+
+    def post_with_text(url, json=None, headers=None, timeout=None):
+        sent.append(dict(json))
+        if "max_tokens" in json:  # pretend this server only accepts max_completion_tokens
+            r = _resp(400)
+            r.text = "Unsupported parameter: 'max_tokens'"
+            return r
+        return _resp(200, {"choices": [{"message": {"content": "<think>x</think>Hello"}}],
+                           "usage": {"prompt_tokens": 120, "completion_tokens": 30}})
+
+    llm.requests.post = post_with_text
+    gem = llm.OpenAICompatibleLLM("gemini-x", "https://generativelanguage.googleapis.com/v1beta/openai", "k", provider="gemini")
+    assert gem.complete("s", "p", max_tokens=50) == "Hello"
+    assert "max_tokens" in sent[0] and "max_completion_tokens" in sent[1], "retries with max_completion_tokens"
+    oa = llm.OpenAICompatibleLLM("gpt-x", "https://api.openai.com/v1", "k", provider="openai")
+    oa.complete("s", "p", max_tokens=50)
+    assert "max_completion_tokens" in sent[-1] and "max_tokens" not in sent[-1]
+
+    month = db.usage_summary(datetime.now().replace(day=1).isoformat()[:10])
+    assert month["gemini"] == {"input": 120, "output": 30, "calls": 1} and month["openai"]["calls"] == 1
+
+    assert "no credits" in llm.friendly_http_error("https://api.openai.com/v1", 429, '{"code":"insufficient_quota"}')
+    assert "rejected the API key" in llm.friendly_http_error("https://generativelanguage.googleapis.com", 400, "API key not valid")
+    assert "no API credits" in llm.friendly_claude_error(400, "Your credit balance is too low")
+
+    llm.requests.get = lambda url, headers=None, timeout=None: _resp(200, {"data": [
+        {"id": "models/gemini-9-pro"}, {"id": "models/gemini-9-flash"}, {"id": "models/text-embedding-004"}, {"id": "models/imagen-4"}]})
+    cfg = setup()
+    cfg["providers"]["gemini"]["api_key_env"] = ""
+    models = llm.list_models(cfg, "gemini")
+    assert models == ["gemini-9-pro", "gemini-9-flash"] and llm.cheapest(models) == "gemini-9-flash"
+
+
 def test_personas():
     from creatoros.personas import persona_prompt
 

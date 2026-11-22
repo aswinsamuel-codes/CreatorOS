@@ -4,8 +4,23 @@ Everything is connected from the dashboard's **🔌 Connections** tab. No files 
 needed.
 
 ```
-[Claude AI] [Telegram] [LinkedIn] [YouTube] [Medium] [dev.to] [your platforms…] [＋ Add a platform]
+[Claude AI] [Google Gemini] [OpenAI] [Telegram] [LinkedIn] [YouTube] [Medium] [dev.to] [your platforms…] [＋ Add a platform]
 ```
+
+Every tile's window also has a **🗑️ Remove** button that deletes the platform's saved keys and
+login, including matching lines in `.env`, so nothing ever needs editing by hand.
+
+## AI tiles: Claude, Gemini, OpenAI
+
+- **Test** sends a tiny request, so it catches keys without credits or quota, not just wrong keys.
+- **Use this AI**: pick a model from your account (the list loads from the provider) and click
+  **✍️ Use for writing** and/or **🔎 Use for picking stories**. Tiles show ✍️ writer / 🔎 scout badges.
+  Tip: a strong model for writing, a cheap fast one (flash / mini / haiku) for picking stories.
+- **📊 Token usage meter**: 0 → 100% of a monthly token budget you set (default 2M), with input
+  tokens, output tokens, requests and today's usage. It counts every request CreatorOS makes since
+  the 1st of the month. Providers don't let apps read your account's remaining credit, so check
+  your provider's billing page for that.
+- Gemini has a free tier (daily limits). Claude and OpenAI need API credits on the account.
 
 Click a tile to open its setup window:
 - numbered steps, each with an **open ↗** button that takes you to the right page,

@@ -168,6 +168,8 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
                                "masked": connections.mask(value) if secret else (value or "")})
             ready = all(x["set"] for x in fields)
             item = {"id": pid, **p, "fields": fields, "ready": ready, "connected": ready}
+            if p.get("ai"):
+                item["uses"] = [role for role in ("writer", "scout") if cfg["models"][role].get("provider") == pid]
             if pid in OAUTH:
                 item["oauth"] = OAUTH[pid].status()
                 item["connected"] = item["oauth"].get("connected", False)
@@ -208,6 +210,79 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
                               and k in {f["name"] for f in connections.PLATFORMS[platform]["fields"]}})
         notify.reset()
         return {"ok": True}
+
+    @app.post("/api/connections/{platform}/remove")
+    def connections_remove(platform: str):
+        """Forget a platform: dashboard-saved keys, its OAuth login, and matching lines in .env."""
+        if platform not in connections.PLATFORMS:
+            raise HTTPException(404, "unknown platform")
+        names = [f["name"] for f in connections.PLATFORMS[platform]["fields"]]
+        connections.set_many({n: "" for n in names})
+        if platform in OAUTH:
+            OAUTH[platform].disconnect()
+        env_file = ROOT / ".env"
+        if env_file.exists():
+            lines = env_file.read_text(encoding="utf-8").splitlines()
+            env_file.write_text("\n".join(
+                f"{ln.split('=', 1)[0]}=" if ln.split("=", 1)[0].strip() in names else ln for ln in lines) + "\n",
+                encoding="utf-8")
+        for n in names:
+            os.environ.pop(n, None)
+        notify.reset()
+        in_use = [r for r in ("writer", "scout") if cfg["models"][r].get("provider") == platform]
+        return {"ok": True, "in_use": in_use}
+
+    @app.get("/api/usage")
+    def usage():
+        now = datetime.now()
+        month = db.usage_summary(now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat())
+        today = db.usage_summary(now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat())
+        budgets = (cfg.get("usage") or {}).get("monthly_budget_tokens") or {}
+        out = {}
+        for p in set(cfg.get("providers", {})) | set(month):
+            m = month.get(p, {"input": 0, "output": 0, "calls": 0})
+            total = m["input"] + m["output"]
+            budget = int(budgets.get(p) or 2000000)
+            out[p] = {**m, "total": total, "budget": budget, "percent": round(min(total / budget * 100, 999), 1),
+                      "today": sum(today.get(p, {}).get(k, 0) for k in ("input", "output"))}
+        return out
+
+    @app.put("/api/usage/budget")
+    def usage_budget(data: dict = Body(...)):
+        provider, tokens = data.get("provider"), int(data.get("tokens") or 0)
+        if provider not in cfg.get("providers", {}) or tokens < 1000:
+            raise HTTPException(400, "Budget must be at least 1,000 tokens")
+        _apply(save_local_config({"usage": {"monthly_budget_tokens": {provider: tokens}}}))
+        return {"ok": True}
+
+    AI_PROVIDERS = ("claude", "openai", "gemini")
+
+    @app.get("/api/connections/{platform}/models")
+    def ai_models(platform: str):
+        from ..llm import list_models
+        if platform not in AI_PROVIDERS:
+            raise HTTPException(404, "not an AI provider")
+        try:
+            models = list_models(cfg, platform)
+        except Exception as e:
+            raise HTTPException(400, str(e))
+        return {"models": models, "writer": cfg["models"]["writer"], "scout": cfg["models"]["scout"]}
+
+    @app.post("/api/connections/{platform}/use")
+    def ai_use(platform: str, data: dict = Body(...)):
+        if platform not in AI_PROVIDERS or platform not in cfg.get("providers", {}):
+            raise HTTPException(404, "not an AI provider")
+        role, model = data.get("role"), (data.get("model") or "").strip()
+        if role not in ("writer", "scout") or not model:
+            raise HTTPException(400, "Choose a model and a role")
+        spec = {"provider": platform, "model": model}
+        if platform == "claude":
+            spec["effort"] = "medium" if role == "writer" else "low"
+        new = save_local_config({"models": {role: spec}})
+        if platform != "claude":  # effort only applies to Claude
+            new["models"][role].pop("effort", None)
+        _apply(new)
+        return {"ok": True, "models": cfg["models"]}
 
     @app.post("/api/connections/telegram/detect")
     def telegram_detect():
@@ -250,6 +325,18 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
             except anthropic.APIStatusError as e:
                 raise RuntimeError(friendly_claude_error(e.status_code, str(e.message)))
             return "Claude key works and your account has credits ✔"
+        if platform in ("openai", "gemini"):
+            from ..llm import OpenAICompatibleLLM, cheapest, list_models
+            prov = cfg["providers"][platform]
+            if not env(prov.get("api_key_env")):
+                raise RuntimeError("Save your API key first")
+            models = list_models(cfg, platform)
+            model = cheapest(models)
+            if not model:
+                raise RuntimeError("Key works, but no chat models are available on this account")
+            # A tiny request proves the key has quota/credits, not just that it exists.
+            OpenAICompatibleLLM(model, prov["base_url"], env(prov.get("api_key_env"))).complete("Reply OK.", "hi", max_tokens=16)
+            return f"{connections.PLATFORMS[platform]['label']} works ✔ ({len(models)} models available)"
         if platform == "telegram":
             from ..notify.telegram import Telegram
             if not env("TELEGRAM_BOT_TOKEN"):

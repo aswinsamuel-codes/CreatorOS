@@ -2,6 +2,24 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Google Gemini** and **OpenAI** tiles on the Connections tab, with guided steps and a Test
+  that checks the key really has quota.
+- **Use this AI**: choose a model from your account and use it for writing and/or picking
+  stories, straight from the tile (no settings files).
+- **🗑️ Remove** on every tile: deletes saved keys, logins and matching `.env` lines.
+- **Token usage meters**: every AI request is counted; each AI tile shows a 0-100% bar of a
+  monthly token budget (editable) plus input/output tokens, requests and today's usage.
+
+### Fixed
+- Claude Test now catches accounts without API credits; plain-language errors for credits,
+  quota, rate limits, bad keys and unknown models (Claude, OpenAI, Gemini).
+- OpenAI's newer models get `max_completion_tokens` (they reject `max_tokens`).
+- The cheap-model picker no longer mistakes "gemini" for a "mini" model.
+- Reddit timeouts no longer slow down every run.
+
 ## [0.4.0] - 2026-11-22
 
 ### Added

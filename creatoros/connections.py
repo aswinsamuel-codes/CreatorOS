@@ -17,12 +17,34 @@ _lock = threading.Lock()
 # setup window with numbered steps (links open in a new tab) and the boxes to fill in.
 PLATFORMS = {
     "claude": {
-        "label": "Claude AI", "logo": "✳️", "color": "#d97757", "group": "AI brain", "auth": "token",
+        "label": "Claude AI", "logo": "✳", "color": "#d97757", "group": "AI brain", "auth": "token", "ai": True,
         "fields": [{"name": "ANTHROPIC_API_KEY", "label": "API key", "placeholder": "sk-ant-…"}],
         "steps": [
             ["Open the Claude Console and sign in", "https://console.anthropic.com/settings/keys"],
             ["Click 'Create Key', give it a name like CreatorOS, and copy it"],
-            ["Paste it below and click Save, then Test"],
+            ["Paste it below and click Save, then Test (Claude needs API credits: console.anthropic.com → Billing)"],
+            ["Under 'Use this AI', pick a model and click 'Use for writing' and/or 'Use for picking stories'"],
+        ],
+    },
+    "gemini": {
+        "label": "Google Gemini", "logo": "✦", "color": "#4285f4", "group": "AI brain", "auth": "token", "ai": True,
+        "fields": [{"name": "GEMINI_API_KEY", "label": "API key", "placeholder": "AIza…"}],
+        "steps": [
+            ["Open Google AI Studio and sign in with your Google account", "https://aistudio.google.com/apikey"],
+            ["Click 'Create API key' (pick or create a project) and copy the key"],
+            ["Paste it below and click Save, then Test (Gemini has a free tier with daily limits)"],
+            ["Under 'Use this AI', pick a model and click 'Use for writing' and/or 'Use for picking stories'"],
+        ],
+    },
+    "openai": {
+        "label": "OpenAI", "logo": "◎", "color": "#10a37f", "group": "AI brain", "auth": "token", "ai": True,
+        "fields": [{"name": "OPENAI_API_KEY", "label": "API key", "placeholder": "sk-…"}],
+        "steps": [
+            ["Open the OpenAI platform and sign in", "https://platform.openai.com/api-keys"],
+            ["Click 'Create new secret key', name it CreatorOS, and copy it (it's shown only once)"],
+            ["Make sure your account has credits (Billing)", "https://platform.openai.com/settings/organization/billing/overview"],
+            ["Paste the key below, Save, then Test"],
+            ["Under 'Use this AI', pick a model and click 'Use for writing' and/or 'Use for picking stories'"],
         ],
     },
     "telegram": {

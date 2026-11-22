@@ -16,6 +16,12 @@ models:
 `effort` (`low`, `medium`, `high`, `xhigh`, `max`) only applies to Claude. Higher effort
 means more careful output and more tokens.
 
+## Switching AI without editing files
+
+Dashboard → **Connections** → click Claude, Gemini or OpenAI → paste the key → **Test** →
+pick a model under **Use this AI** → **Use for writing** / **Use for picking stories**.
+Each AI tile also shows a monthly token usage meter.
+
 ## Claude (default)
 
 ```yaml

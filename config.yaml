@@ -127,6 +127,12 @@ marketing:
     video_script: "15:00"
     newsletter: "08:00"
 
+# ---------------------------------------------------------------------------
+# Token usage meters (Connections tab). The budget is the 100% mark per month.
+# ---------------------------------------------------------------------------
+usage:
+  monthly_budget_tokens: { claude: 2000000, openai: 2000000, gemini: 2000000, ollama: 10000000 }
+
 dashboard:
   host: 127.0.0.1     # use 0.0.0.0 on the lab cluster (and set DASHBOARD_TOKEN in .env)
   port: 8787

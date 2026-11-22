@@ -572,11 +572,14 @@ const runVideo = () => safe(async () => {
 let CONN = { platforms: [], custom: [] };
 async function loadConnections() {
   CONN = await api("/api/connections");
-  const tile = (onclick, color, logo, name, grp, ok, label) => `<div class="tile" onclick="${onclick}">
+  try { USAGE = await api("/api/usage"); } catch { USAGE = {}; }
+  const tile = (onclick, color, logo, name, grp, ok, label, extra = "") => `<div class="tile" onclick="${onclick}">
       <div class="logo-c" style="background:${color}">${esc(logo)}</div><div class="name">${esc(name)}</div><div class="grp">${esc(grp)}</div>
-      <span class="badge ${ok ? "s-published" : "s-pending"}">${esc(label)}</span></div>`;
+      <span class="badge ${ok ? "s-published" : "s-pending"}">${esc(label)}</span>${extra}</div>`;
+  const aiExtra = c => !c.ai ? "" : `${(c.uses || []).map(u => `<span class="badge bg-yellow" style="margin-left:4px">${u === "writer" ? "✍️ writer" : "🔎 scout"}</span>`).join("")}
+      ${usageBar(USAGE[c.id], true)}`;
   $("connGrid").innerHTML =
-    CONN.platforms.map(c => tile(`openPlatform('${c.id}')`, c.color, c.logo, c.label, c.group, c.connected, c.connected ? "✔ connected" : "connect")).join("") +
+    CONN.platforms.map(c => tile(`openPlatform('${c.id}')`, c.color, c.logo, c.label, c.group, c.connected, c.connected ? "✔ connected" : "connect", aiExtra(c))).join("") +
     CONN.custom.map(c => tile(`openCustom('${c.id}')`, c.color, c.name.slice(0, 2).toUpperCase(), c.name, "Custom · webhook/API", true, "✔ added")).join("") +
     `<div class="tile add" onclick="openCustom()"><div class="logo-c">＋</div><div class="name">Add a platform</div><div class="grp">Any app with an API or webhook</div><span class="badge bg-white">add</span></div>`;
 }
@@ -607,9 +610,69 @@ function openPlatform(id) {
       <h2 style="margin:0">Connect ${esc(c.label)}</h2></div>
     ${stepsHtml(c.steps)}${fields}
     <div class="row"><button class="btn green" onclick="saveConn('${c.id}')">💾 Save</button>
-      ${c.oauth ? "" : `<button class="btn white" onclick="testConn('${c.id}')">🧪 Test</button>`}</div>${oauth}
-    <p class="hint" id="connMsg"></p>`);
+      ${c.oauth ? "" : `<button class="btn white" onclick="testConn('${c.id}')">🧪 Test</button>`}
+      ${c.ready || c.connected ? `<button class="btn red" onclick="removeConn('${c.id}')">🗑️ Remove</button>` : ""}</div>${oauth}
+    <p class="hint" id="connMsg"></p>
+    ${c.ai ? `<div class="card" style="margin:16px 0 0;box-shadow:var(--shadow-sm)">
+      <h3 style="margin-top:0">🧠 Use this AI</h3>
+      <p class="hint">Currently used for: <b>${(c.uses || []).map(u => u === "writer" ? "writing posts" : "picking stories").join(" + ") || "nothing yet"}</b></p>
+      <div class="row" style="margin-top:0"><select id="aiModel" class="grow"><option>${c.ready ? "Loading models…" : "Save your key first"}</option></select></div>
+      <div class="row"><button class="btn pink sm" onclick="useAI('${c.id}', 'writer')" ${c.ready ? "" : "disabled"}>✍️ Use for writing</button>
+        <button class="btn blue sm" onclick="useAI('${c.id}', 'scout')" ${c.ready ? "" : "disabled"}>🔎 Use for picking stories</button></div>
+      <p class="hint">Tip: use a strong model for writing and a cheap, fast one (flash / mini / haiku) for picking stories.</p>
+    </div>
+    <div class="card" style="margin:16px 0 0;box-shadow:var(--shadow-sm)">
+      <h3 style="margin-top:0">📊 Token usage this month</h3>${usageDetails(c.id)}</div>` : ""}`);
+  if (c.ai && c.ready) loadAIModels(c.id);
 }
+let USAGE = {};
+function fmtNum(n) { return n >= 1e6 ? (n / 1e6).toFixed(n >= 1e7 ? 0 : 1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n || 0); }
+function usageBar(u, small) {
+  if (!u) return "";
+  const pct = Math.min(100, u.percent), col = pct >= 90 ? "var(--red)" : pct >= 70 ? "var(--orange)" : "var(--lime)";
+  return `<div style="margin-top:${small ? 10 : 6}px;text-align:left">
+    <div style="height:${small ? 12 : 22}px;border:2px solid var(--ink);background:#fff;position:relative">
+      <div style="height:100%;width:${pct}%;background:${col};border-right:${pct > 0 && pct < 100 ? "2px solid var(--ink)" : "0"}"></div>
+      ${small ? "" : `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">${u.percent}%</span>`}</div>
+    <div style="display:flex;justify-content:space-between;font-size:${small ? 11 : 12}px;margin-top:2px"><span>0</span><span>${fmtNum(u.total)} / ${fmtNum(u.budget)}</span><span>100%</span></div></div>`;
+}
+function usageDetails(id) {
+  const u = USAGE[id] || { total: 0, budget: 0, percent: 0, input: 0, output: 0, calls: 0, today: 0 };
+  return `${usageBar(u, false)}
+    <table style="margin-top:10px"><tr><td>Input tokens (what CreatorOS sent)</td><td><b>${(u.input || 0).toLocaleString()}</b></td></tr>
+      <tr><td>Output tokens (what the AI wrote)</td><td><b>${(u.output || 0).toLocaleString()}</b></td></tr>
+      <tr><td>Requests</td><td><b>${(u.calls || 0).toLocaleString()}</b></td></tr>
+      <tr><td>Used today</td><td><b>${(u.today || 0).toLocaleString()}</b></td></tr></table>
+    <label>Monthly budget (tokens) - the 100% mark</label>
+    <div class="row" style="margin-top:0"><input id="budget" type="number" min="1000" step="100000" value="${u.budget || 2000000}" style="width:200px">
+      <button class="btn white sm" onclick="saveBudget('${id}')">Save budget</button></div>
+    <p class="hint">Counts every request CreatorOS makes with this AI since the 1st of the month. Your provider's own dashboard shows your
+      account's remaining credit (apps can't read it).</p>`;
+}
+const saveBudget = id => safe(async () => {
+  await api("/api/usage/budget", "PUT", { provider: id, tokens: +$("budget").value });
+  USAGE = await api("/api/usage"); toast("Budget saved"); openPlatform(id);
+});
+async function loadAIModels(id) {
+  try {
+    const r = await api(`/api/connections/${id}/models`);
+    const current = [r.writer, r.scout].filter(m => m.provider === id).map(m => m.model)[0];
+    $("aiModel").innerHTML = r.models.map(m => `<option ${m === current ? "selected" : ""}>${esc(m)}</option>`).join("") || "<option>No models found</option>";
+  } catch (e) { $("aiModel").innerHTML = `<option>${esc(e.message)}</option>`; }
+}
+const useAI = (id, role) => safe(async () => {
+  const model = $("aiModel").value;
+  await api(`/api/connections/${id}/use`, "POST", { role, model });
+  toast(`${role === "writer" ? "Writing" : "Picking stories"} now uses ${model} ✔`);
+  CONN = await api("/api/connections"); openPlatform(id);
+});
+const removeConn = id => safe(async () => {
+  const c = CONN.platforms.find(p => p.id === id);
+  if (!confirm(`Remove ${c.label}? Its saved keys${c.oauth ? " and login" : ""} will be deleted from CreatorOS (including .env).`)) return;
+  const r = await api(`/api/connections/${id}/remove`, "POST");
+  toast(r.in_use.length ? `${c.label} removed - choose another AI for ${r.in_use.join(" and ")} so posts keep working` : `${c.label} removed`, r.in_use.length > 0);
+  CONN = await api("/api/connections"); openPlatform(id);
+});
 const saveConn = id => safe(async () => {
   const values = {}; document.querySelectorAll("#modal .c-f").forEach(i => { if (i.value.trim() && !i.disabled) values[i.dataset.name] = i.value.trim(); });
   if (!Object.keys(values).length) return toast("Paste something first", true);
