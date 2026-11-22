@@ -55,6 +55,24 @@ pending ──approve──▶ published
 (any publish error with no successful target) ──▶ failed
 ```
 
+## Folder → post pipeline
+
+`creatoros/modules/social/folder.py`: scan folder → convert each file to JPEG (PDF first
+page via PyMuPDF, resized with Pillow) → **scout model** reads each image (vision) and
+returns JSON details → **writer model** composes the post in the chosen agent role →
+saved as `kind: social` posts with `media`, `targets` and `scheduled_at` →
+`pipeline.approve()` publishes now or marks `scheduled` → `pipeline.publish_due()` (every
+2 minutes) publishes due posts. See [FOLDER_POSTS.md](FOLDER_POSTS.md).
+
+## Agent roles and connections
+
+- `creatoros/personas.py`: built-in roles plus custom; `profile.author_context()` puts
+  role + profile + documents at the top of every writer prompt.
+- `creatoros/connections.py`: OAuth tokens and keys from the dashboard in
+  `data/connections.json`; `config.env()` checks `.env` first, then this store.
+- `creatoros/publishers/linkedin.py`: OAuth (authorization code flow with `state`),
+  Images API upload, Posts API (single or multi-image).
+
 ## Model layer
 
 `creatoros/llm.py` exposes one method, `complete(system, prompt) -> str`, behind two

@@ -24,6 +24,13 @@ def load_profile() -> dict:
         return yaml.safe_load(f) or {}
 
 
+def author_context(cfg: dict, role: str | None = None, custom: str | None = None) -> str:
+    """Agent role + author profile + documents: the background every writer prompt gets."""
+    from .personas import persona_prompt
+
+    return persona_prompt(cfg, role, custom) + "\n\n" + profile_prompt()
+
+
 def profile_prompt() -> str:
     """Profile fields plus the author's enabled documents (resume etc.)."""
     from .documents import documents_prompt

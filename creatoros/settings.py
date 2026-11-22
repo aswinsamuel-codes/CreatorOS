@@ -4,6 +4,7 @@ import re
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .modules.blog.angles import all_angles
+from .personas import PERSONAS
 from .publishers import PUBLISHERS
 
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -61,6 +62,11 @@ def validate(cfg: dict) -> list[str]:
     if status not in ("draft", "public", "unlisted"):
         errors.append("Medium status must be draft, public or unlisted")
 
+    role = (cfg.get("persona") or {}).get("role", "tech_blogger")
+    if role not in PERSONAS:
+        errors.append(f"Unknown agent role '{role}'")
+    elif role == "custom" and not (cfg.get("persona") or {}).get("custom", "").strip():
+        errors.append("Custom agent role needs your instructions")
     if not isinstance(cfg.get("paused", False), bool):
         errors.append("paused must be true or false")
     mins = cfg.get("approval", {}).get("auto_publish_after_minutes", 0)

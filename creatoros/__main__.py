@@ -3,6 +3,7 @@
     python -m creatoros check                 # verify keys, Medium, Telegram, FFmpeg
     python -m creatoros scout                 # show today's candidate stories
     python -m creatoros write --angle news    # write one post now (optionally --topic "...")
+    python -m creatoros folder D:\Certs -i "share all in one post" --to linkedin
     python -m creatoros list                  # list posts
     python -m creatoros publish 3             # publish post #3
     python -m creatoros telegram-chat-id      # find your Telegram chat id
@@ -72,6 +73,15 @@ def cmd_write(cfg, args):
     print(f"Saved to: {pipeline.save_markdown(p)}")
 
 
+def cmd_folder(cfg, args):
+    from .modules.social import folder
+    ids = folder.create_posts(cfg, args.path, args.instructions or "", args.to.split(","), args.mode,
+                              args.interval, notify_user=not args.no_notify, role=args.role)
+    for pid in ids:
+        p = db.get_post(pid)
+        print(f"\nPost #{pid} [{p['status']}] -> {', '.join(p['targets'])} at {p['scheduled_at']}\n{p['body']}\n")
+
+
 def cmd_list(cfg, _):
     for p in db.list_posts(30):
         print(f"#{p['id']:<4} {p['status']:<10} {p['angle']:<9} {p['title']}")
@@ -124,6 +134,14 @@ def main(argv=None):
     w.add_argument("--angle", default="news")
     w.add_argument("--topic")
     w.add_argument("--no-notify", action="store_true")
+    fo = sub.add_parser("folder", help="turn a folder of images/PDFs into social posts")
+    fo.add_argument("path")
+    fo.add_argument("--instructions", "-i", default="")
+    fo.add_argument("--to", default="linkedin", help="comma-separated targets")
+    fo.add_argument("--mode", choices=["combined", "series"], default="combined")
+    fo.add_argument("--interval", type=float, default=24, help="hours between series posts")
+    fo.add_argument("--role", help="agent role, e.g. personal_brand")
+    fo.add_argument("--no-notify", action="store_true")
     sub.add_parser("list")
     p = sub.add_parser("publish")
     p.add_argument("id", type=int)
@@ -134,7 +152,7 @@ def main(argv=None):
     setup_logging()
     cfg = load_config(args.config)
     db.init()
-    handlers = {"check": cmd_check, "scout": cmd_scout, "write": cmd_write, "list": cmd_list,
+    handlers = {"check": cmd_check, "scout": cmd_scout, "write": cmd_write, "folder": cmd_folder, "list": cmd_list,
                 "publish": cmd_publish, "telegram-chat-id": cmd_chat_id, "run": cmd_run}
     try:
         return handlers[args.cmd](cfg, args) or 0

@@ -2,6 +2,27 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Folder → post**: point the agent at a folder of certificates, badges, screenshots or
+  photos (JPG, PNG, WEBP, PDF). A vision model reads each file and the writer creates
+  LinkedIn posts, as one multi-image post (split above 20) or a scheduled series.
+  Dashboard tab with example instructions, plus `python -m creatoros folder`.
+- **LinkedIn publisher** using the official API with "Connect with LinkedIn" (OAuth):
+  text, single-image and multi-image posts, alt text, hashtags.
+- **Connections tab**: OAuth status, redirect URL, and API keys saved locally
+  (`data/connections.json`); `.env` still takes priority.
+- **Agent roles**: tech blogger, marketing strategist, developer advocate, content creator,
+  personal-brand coach, startup founder, teacher, or custom; per-job override for folder posts.
+- Scheduled posts: approving a future post marks it `scheduled`; published automatically
+  when due. "Publish now" in the dashboard.
+- Telegram previews include the post images.
+- Image input for models (Claude and OpenAI-compatible vision models).
+
+### Changed
+- `start_creatoros.bat` uses the project's `.venv` when present.
+
 ## [0.2.0] - 2026-11-22
 
 ### Added

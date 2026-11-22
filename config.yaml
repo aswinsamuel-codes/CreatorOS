@@ -3,6 +3,15 @@
 # These are the defaults. Changes you make in the dashboard's Settings tab are saved to
 # config.local.yaml (ignored by git) and override this file. See docs/CONFIGURATION.md.
 
+# Agent role: how the agent thinks and writes.
+#   tech_blogger, marketing_strategist, developer_advocate, content_creator,
+#   personal_brand, startup_founder, educator, custom
+# custom: your own instructions (used as the whole role when role is "custom",
+#         otherwise added on top of the chosen role).
+persona:
+  role: tech_blogger
+  custom: ""
+
 # Timezone for the schedule, e.g. Asia/Kolkata, Europe/London, America/New_York.
 # Empty = your computer's local time.
 timezone: ""
@@ -98,6 +107,7 @@ publish:
   targets: [medium]
   medium: { publish_status: draft, notify_followers: false }
   devto: { published: false }
+  linkedin: { visibility: PUBLIC, api_version: "202610" }   # PUBLIC or CONNECTIONS
 
 dashboard:
   host: 127.0.0.1     # use 0.0.0.0 on the lab cluster (and set DASHBOARD_TOKEN in .env)

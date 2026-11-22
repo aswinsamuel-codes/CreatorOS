@@ -1,10 +1,11 @@
 """Publisher plugins. Each one exposes publish(post, cfg) -> url."""
 
-from . import devto, markdown_file, medium
+from . import devto, linkedin, markdown_file, medium
 
 PUBLISHERS = {
     "medium": medium.publish,
     "devto": devto.publish,
+    "linkedin": linkedin.publish,
     "markdown": markdown_file.publish,
 }
 

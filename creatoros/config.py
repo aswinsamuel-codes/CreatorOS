@@ -29,7 +29,8 @@ def setup_logging() -> None:
 LOCAL_CONFIG = ROOT / "config.local.yaml"
 
 # Sections the dashboard is allowed to change (secrets always stay in .env).
-EDITABLE_SECTIONS = ("models", "providers", "blog", "approval", "publish", "dashboard", "timezone", "paused")
+EDITABLE_SECTIONS = ("models", "providers", "blog", "approval", "publish", "dashboard", "timezone", "paused",
+                     "persona")
 
 
 def deep_merge(base: dict, override: dict) -> dict:
@@ -81,7 +82,11 @@ def reset_local_config() -> dict:
 
 
 def env(name: str | None, default: str | None = None) -> str | None:
+    """A secret/setting from .env, falling back to keys saved on the dashboard's Connections tab."""
     if not name:
         return default
     value = os.environ.get(name, "").strip()
-    return value or default
+    if value:
+        return value
+    from . import connections
+    return connections.get(name) or default

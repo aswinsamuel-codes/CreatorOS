@@ -36,15 +36,47 @@ class Telegram:
                         disable_web_page_preview=True, **extra)
 
     # ----------------------------------------------------------- messages
+    def send_photos(self, media: list[dict]) -> None:
+        """Send up to 10 images as an album (Telegram's limit)."""
+        from pathlib import Path
+        import json as _json
+
+        items = [m for m in media if Path(m["path"]).exists()][:10]
+        if not items:
+            return
+        if len(items) == 1:
+            with open(items[0]["path"], "rb") as f:
+                self.api("sendPhoto", chat_id=self.chat_id, files={"photo": f}, timeout=60)
+            return
+        files = {f"p{i}": open(m["path"], "rb") for i, m in enumerate(items)}
+        try:
+            album = [{"type": "photo", "media": f"attach://p{i}"} for i in range(len(items))]
+            self.api("sendMediaGroup", chat_id=self.chat_id, media=_json.dumps(album), files=files, timeout=120)
+        finally:
+            for f in files.values():
+                f.close()
+
     def send_for_approval(self, post: dict) -> None:
         e = html.escape
-        preview = post["body"][:1500].rsplit("\n", 1)[0]
-        text = (
-            f"📝 <b>New post #{post['id']}</b> ({e(post['angle'])})\n\n"
-            f"<b>{e(post['title'])}</b>\n<i>{e(post.get('subtitle') or '')}</i>\n"
-            f"Tags: {e(', '.join(post.get('tags', [])))}\n\n"
-            f"{e(preview)}\n\n…"
-        )
+        if post.get("kind") == "social":
+            try:
+                self.send_photos(post.get("media") or [])
+            except Exception as ex:
+                log.warning("Could not send preview images: %s", ex)
+            when = (post.get("scheduled_at") or "").replace("T", " ")
+            text = (
+                f"📣 <b>New {e('/'.join(post.get('targets') or ['social']))} post #{post['id']}</b> "
+                f"({len(post.get('media') or [])} images{', scheduled ' + e(when) if when else ''})\n\n"
+                f"{e(post['body'][:3000])}"
+            )
+        else:
+            preview = post["body"][:1500].rsplit("\n", 1)[0]
+            text = (
+                f"📝 <b>New post #{post['id']}</b> ({e(post['angle'])})\n\n"
+                f"<b>{e(post['title'])}</b>\n<i>{e(post.get('subtitle') or '')}</i>\n"
+                f"Tags: {e(', '.join(post.get('tags', [])))}\n\n"
+                f"{e(preview)}\n\n…"
+            )
         pid = post["id"]
         keyboard = {"inline_keyboard": [
             [{"text": "✅ Publish", "callback_data": f"approve:{pid}"},
@@ -111,11 +143,11 @@ class Telegram:
             if not post:
                 self.send_text(f"Post #{post_id} not found.")
             elif action == "approve":
-                if post["status"] == "published":
-                    self.send_text(f"#{post_id} is already published.")
+                if post["status"] in ("published", "scheduled"):
+                    self.send_text(f"#{post_id} is already {post['status']}.")
                 else:
-                    self.send_text(f"Publishing #{post_id}…")
-                    pipeline.publish_post(cfg, post_id)
+                    self.send_text(f"Approving #{post_id}…")
+                    pipeline.approve(cfg, post_id)
             elif action == "reject":
                 pipeline.reject(post_id)
                 self.send_text(f"Skipped #{post_id}.")

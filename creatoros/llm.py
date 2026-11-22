@@ -29,12 +29,17 @@ class AnthropicLLM:
         self.model = model
         self.effort = effort
 
-    def complete(self, system: str, prompt: str, max_tokens: int = 32000) -> str:
+    def complete(self, system: str, prompt: str, max_tokens: int = 32000, images: list | None = None) -> str:
+        """images: list of (media_type, base64_data) tuples, e.g. ("image/png", "iVBOR...")."""
+        content = prompt
+        if images:
+            content = [{"type": "image", "source": {"type": "base64", "media_type": mt, "data": b64}}
+                       for mt, b64 in images] + [{"type": "text", "text": prompt}]
         kwargs = dict(
             model=self.model,
             max_tokens=max_tokens,
             system=system,
-            messages=[{"role": "user", "content": prompt}],
+            messages=[{"role": "user", "content": content}],
         )
         if self.effort:
             kwargs["output_config"] = {"effort": self.effort}
@@ -71,16 +76,21 @@ class OpenAICompatibleLLM:
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
 
-    def complete(self, system: str, prompt: str, max_tokens: int = 8000) -> str:
+    def complete(self, system: str, prompt: str, max_tokens: int = 8000, images: list | None = None) -> str:
         headers = {"Content-Type": "application/json"}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        user_content = prompt
+        if images:  # vision models (e.g. gemma3, llava, qwen-vl, gpt-4o)
+            user_content = [{"type": "text", "text": prompt}] + [
+                {"type": "image_url", "image_url": {"url": f"data:{mt};base64,{b64}"}} for mt, b64 in images
+            ]
         body = {
             "model": self.model,
             "max_tokens": max_tokens,
             "messages": [
                 {"role": "system", "content": system},
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": user_content},
             ],
         }
         try:

@@ -11,6 +11,28 @@ by git. Delete it (or click *Reset everything to defaults*) to start over.
 
 Secrets live only in `.env`. See [`.env.example`](../.env.example).
 
+## Agent role (persona)
+
+```yaml
+persona:
+  role: tech_blogger   # see list below
+  custom: ""           # your own instructions
+```
+
+| Role | Writes like |
+|---|---|
+| `tech_blogger` | Insightful tech blogger: what's new, why it matters, honest opinion |
+| `marketing_strategist` | Growth marketer: clear audience, hook, one call to action, no clickbait |
+| `developer_advocate` | Practical and technical, with steps and trade-offs |
+| `content_creator` | Punchy hooks, storytelling, conversational |
+| `personal_brand` | Highlights your journey and skills for recruiters and clients |
+| `startup_founder` | Markets, customers, execution, lessons from building |
+| `educator` | First principles and analogies, then deeper |
+| `custom` | Entirely your own instructions in `custom` |
+
+With a built-in role, `custom` adds extra rules on top. Pick it in **Settings → Agent role**;
+folder jobs can use a different role per job.
+
 ## Mode: approval or auto
 
 ```yaml

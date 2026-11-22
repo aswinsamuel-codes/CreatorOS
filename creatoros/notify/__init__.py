@@ -8,10 +8,16 @@ _bot: Telegram | None = None
 
 
 def bot() -> Telegram | None:
+    """The Telegram bot, or None. reset() makes it re-read the settings (after Connections change)."""
     global _bot
     if _bot is None:
         _bot = Telegram.from_env()
     return _bot
+
+
+def reset() -> None:
+    global _bot
+    _bot = None
 
 
 def send_for_approval(post: dict) -> None:

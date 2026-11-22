@@ -11,6 +11,8 @@ workspace/clips/*
 workspace/references/*
 workspace/music/*
 workspace/voices/*
+workspace/media/
+workspace/inbox/
 !workspace/**/.gitkeep
 
 # Your personal details and notes stay on your machine

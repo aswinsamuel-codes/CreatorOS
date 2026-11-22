@@ -11,7 +11,8 @@ EDITOR_SYSTEM = (
     "Reply with JSON only."
 )
 
-WRITER_SYSTEM = """You are the lead writer for this author's tech blog on Medium.
+WRITER_SYSTEM = """You write blog posts for this author (published on Medium and similar platforms).
+Act in the role given under AUTHOR PROFILE.
 
 Rules:
 - Write original, engaging posts. Never copy sentences from the sources; synthesise and add insight.

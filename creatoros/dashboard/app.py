@@ -1,14 +1,19 @@
 """Local web dashboard: review posts, approve/edit/publish, write now, edit your profile."""
 
+import os
 import re
 import threading
 from pathlib import Path
+from urllib.parse import quote
 
 import yaml
 from fastapi import Body, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
-from .. import __version__, db, documents, scheduler
+from .. import __version__, connections, db, documents, notify, scheduler
+from ..modules.social import folder as folder_mod
+from ..personas import list_personas
+from ..publishers import linkedin
 from ..config import (EDITABLE_SECTIONS, ROOT, deep_merge, env, load_config, log, read_local_config_text,
                       reset_local_config, save_local_config, write_local_config_text)
 from ..modules.blog import pipeline
@@ -24,9 +29,12 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
     app = FastAPI(title="CreatorOS")
     token = env("DASHBOARD_TOKEN")
 
+    # Browser redirects (OAuth) can't send the x-token header; the callback is protected by `state`.
+    OPEN_PATHS = ("/api/connections/linkedin/start", "/api/connections/linkedin/callback")
+
     @app.middleware("http")
     async def check_token(request: Request, call_next):
-        if token and request.url.path.startswith("/api"):
+        if token and request.url.path.startswith("/api") and request.url.path not in OPEN_PATHS:
             if request.headers.get("x-token") != token:
                 return JSONResponse({"detail": "unauthorized"}, status_code=401)
         return await call_next(request)
@@ -125,10 +133,98 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
         pipeline.save_markdown(db.get_post(post_id))
         return {"ok": True}
 
+    @app.post("/api/posts/{post_id}/approve")
+    def approve(post_id: int):
+        _post(post_id)
+        return {"status": pipeline.approve(cfg, post_id)}
+
     @app.post("/api/posts/{post_id}/publish")
     def publish(post_id: int):
         _post(post_id)
         return pipeline.publish_post(cfg, post_id)
+
+    # --------------------------------------------------------- connections
+    @app.get("/api/connections")
+    def connections_list(request: Request):
+        out = []
+        for pid, p in connections.PLATFORMS.items():
+            fields = []
+            for f in p["fields"]:
+                in_env = bool(os.environ.get(f, "").strip())
+                value = env(f)
+                fields.append({"name": f, "set": bool(value), "source": "env" if in_env else "dashboard",
+                               "masked": connections.mask(value)})
+            item = {"id": pid, **p, "fields": fields, "ready": all(x["set"] for x in fields)}
+            if pid == "linkedin":
+                item["oauth"] = linkedin.status()
+                item["redirect_uri"] = linkedin.redirect_uri(str(request.base_url))
+            out.append(item)
+        return out
+
+    @app.put("/api/connections/{platform}")
+    def connections_save(platform: str, data: dict = Body(...)):
+        if platform not in connections.PLATFORMS:
+            raise HTTPException(404, "unknown platform")
+        allowed = connections.PLATFORMS[platform]["fields"]
+        connections.set_many({k: v for k, v in (data.get("values") or {}).items() if k in allowed})
+        notify.reset()
+        return {"ok": True}
+
+    @app.get("/api/connections/linkedin/start")
+    def linkedin_start(request: Request):
+        try:
+            return RedirectResponse(linkedin.auth_url(str(request.base_url)))
+        except RuntimeError as e:
+            return RedirectResponse(f"/?error={quote(str(e))}")
+
+    @app.get("/api/connections/linkedin/callback")
+    def linkedin_callback(request: Request, code: str = "", state: str = "", error: str = "",
+                          error_description: str = ""):
+        if error:
+            return RedirectResponse(f"/?error={quote(error_description or error)}")
+        try:
+            info = linkedin.finish_auth(code, state, str(request.base_url))
+        except Exception as e:
+            log.error("LinkedIn connect failed: %s", e)
+            return RedirectResponse(f"/?error={quote(str(e))}")
+        return RedirectResponse(f"/?connected={quote(info.get('name') or 'LinkedIn')}")
+
+    @app.post("/api/connections/linkedin/disconnect")
+    def linkedin_disconnect():
+        linkedin.disconnect()
+        return {"ok": True}
+
+    # ------------------------------------------------------ personas/folder
+    @app.get("/api/personas")
+    def personas_list():
+        return {"personas": list_personas(), "current": cfg.get("persona") or {}}
+
+    @app.post("/api/folder/scan")
+    def folder_scan(data: dict = Body(...)):
+        try:
+            files = folder_mod.scan(data.get("folder", ""))
+        except FileNotFoundError as e:
+            raise HTTPException(400, str(e))
+        return {"count": len(files), "files": [f.name for f in files]}
+
+    @app.post("/api/folder/run")
+    def folder_run(data: dict = Body(...)):
+        try:
+            folder_mod.scan(data.get("folder", ""))
+        except FileNotFoundError as e:
+            raise HTTPException(400, str(e))
+        targets = [t for t in data.get("targets", []) if t in PUBLISHERS] or ["linkedin"]
+        _bg(folder_mod.create_posts, cfg, data["folder"], data.get("instructions", ""), targets,
+            data.get("mode", "combined"), float(data.get("interval_hours") or 24), data.get("start_at") or None,
+            True, data.get("role") or None, data.get("custom_role"))
+        return {"ok": True, "message": "Inspecting your files and writing posts (about 10-30 s per file)"}
+
+    @app.get("/api/media")
+    def media(path: str):
+        p = Path(path).resolve()
+        if folder_mod.MEDIA_DIR.resolve() not in p.parents or not p.is_file():
+            raise HTTPException(404, "not found")
+        return FileResponse(p)
 
     @app.post("/api/posts/{post_id}/reject")
     def reject(post_id: int):

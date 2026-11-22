@@ -9,7 +9,15 @@ from .config import DATA_DIR
 
 DB_PATH = DATA_DIR / "creatoros.db"
 _lock = threading.Lock()
-JSON_FIELDS = ("sources", "tags", "published")
+JSON_FIELDS = ("sources", "tags", "published", "media", "targets")
+
+# Columns added after v0.1 (added automatically to older databases).
+MIGRATIONS = {
+    "kind": "TEXT DEFAULT 'blog'",   # blog | social
+    "media": "TEXT",                 # [{"path": "...", "alt": "..."}]
+    "targets": "TEXT",               # per-post publish targets, e.g. ["linkedin"]
+    "scheduled_at": "TEXT",          # publish at/after this time (ISO)
+}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS posts (
@@ -41,6 +49,19 @@ def _connect() -> sqlite3.Connection:
 def init() -> None:
     with _lock, _connect() as c:
         c.executescript(SCHEMA)
+        existing = {r["name"] for r in c.execute("PRAGMA table_info(posts)").fetchall()}
+        for col, decl in MIGRATIONS.items():
+            if col not in existing:
+                c.execute(f"ALTER TABLE posts ADD COLUMN {col} {decl}")
+
+
+def due_scheduled(now_iso: str) -> list[dict]:
+    with _lock, _connect() as c:
+        rows = c.execute(
+            "SELECT * FROM posts WHERE status = 'scheduled' AND (scheduled_at IS NULL OR scheduled_at <= ?)",
+            (now_iso,),
+        ).fetchall()
+    return [_decode(r) for r in rows]
 
 
 def _decode(row: sqlite3.Row | None) -> dict | None:
@@ -49,6 +70,7 @@ def _decode(row: sqlite3.Row | None) -> dict | None:
     d = dict(row)
     for k in JSON_FIELDS:
         d[k] = json.loads(d[k]) if d.get(k) else ({} if k == "published" else [])
+    d["kind"] = d.get("kind") or "blog"
     return d
 
 

@@ -34,6 +34,13 @@ def _auto_publish(cfg: dict) -> None:
             pipeline.publish_post(cfg, post["id"])
 
 
+def _publish_due(cfg: dict) -> None:
+    try:
+        pipeline.publish_due(cfg)
+    except Exception:
+        log.exception("Publishing scheduled posts failed")
+
+
 def _add_slots(sched: BackgroundScheduler, cfg: dict) -> None:
     tz = cfg.get("timezone") or None
     for i, slot in enumerate(cfg["blog"].get("schedule", [])):
@@ -50,6 +57,7 @@ def start(cfg: dict) -> BackgroundScheduler:
     sched = BackgroundScheduler(timezone=cfg.get("timezone") or None)
     _add_slots(sched, cfg)
     sched.add_job(_auto_publish, "interval", minutes=5, args=[cfg], id="auto-publish")
+    sched.add_job(_publish_due, "interval", minutes=2, args=[cfg], id="publish-due")
     sched.start()
     for run in next_runs(sched):
         log.info("Scheduled %s (%s) -> next run %s", run["time"], run["angle"], run["next"])

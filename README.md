@@ -19,6 +19,21 @@ Post   -> Medium (draft or public), dev.to, or Markdown files
 Report -> sends you the live link
 ```
 
+### Folder → post (bulk certificates and more)
+Point the agent at a folder of certificates, badges, project screenshots or event photos.
+It reads every file (images and PDFs), writes LinkedIn posts in your voice, and posts them
+as one multi-image post or as a series (e.g. one a day) after your approval.
+See [docs/FOLDER_POSTS.md](docs/FOLDER_POSTS.md).
+
+### Connections
+Connect LinkedIn with its official login (no passwords stored) and paste API keys for
+Medium, dev.to, Telegram and Claude in the dashboard. See [docs/CONNECTIONS.md](docs/CONNECTIONS.md).
+
+### Agent roles
+Choose how the agent thinks and writes: tech blogger, marketing strategist, developer
+advocate, content creator, personal-brand coach, startup founder, teacher, or your own
+custom role.
+
 ### Two modes
 | Mode | Behaviour |
 |---|---|
@@ -42,8 +57,10 @@ Default daily schedule: 09:00 news · 12:00 future · 15:00 news · 18:00 busine
 ## Setup
 
 ```powershell
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
-copy .env.example .env      # then open .env and add your keys
+copy .env.example .env      # optional: keys can also be added in the dashboard's Connections tab
 python -m creatoros check
 ```
 
@@ -113,6 +130,8 @@ open `http://<host>:8787/?token=<your token>`.
 | [Models](docs/MODELS.md) | Claude, Ollama/local clusters, OpenAI, Gemini and more |
 | [Publishers](docs/PUBLISHERS.md) | Medium, dev.to, Markdown, writing your own publisher |
 | [Telegram](docs/TELEGRAM.md) | Bot setup, approval buttons, commands |
+| [Connections](docs/CONNECTIONS.md) | LinkedIn official login, API keys |
+| [Folder → post](docs/FOLDER_POSTS.md) | Turning certificates/screenshots/photos into posts |
 | [Contributing](CONTRIBUTING.md) | Dev setup, tests, guidelines, releases |
 | [Changelog](CHANGELOG.md) | What changed in each version |
 

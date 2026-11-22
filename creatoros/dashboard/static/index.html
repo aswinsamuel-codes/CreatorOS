@@ -42,6 +42,11 @@
   .item:hover { background:#fff1c1; } .item.sel { background:var(--yellow); }
   .item .t { font-weight:700; } .item .m { font-size:13px; margin-top:4px; }
   .badge { display:inline-block; font-size:12px; font-weight:700; padding:1px 8px; border:2px solid var(--ink); text-transform:uppercase; }
+  .s-scheduled { background:var(--purple); }
+  .thumbs { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
+  .thumbs img { width:140px; height:100px; object-fit:cover; border:var(--b); box-shadow:var(--shadow-sm); background:#fff; }
+  .chip { font:600 13px "Space Grotesk", sans-serif; background:var(--white); border:2px solid var(--ink); padding:3px 10px; cursor:pointer; }
+  .chip:hover { background:var(--yellow); }
   .s-pending { background:var(--orange); } .s-published { background:var(--lime); } .s-failed, .s-rejected { background:var(--red); color:#fff; } .s-approved { background:var(--blue); }
   .btn { font:700 15px "Space Grotesk", sans-serif; background:var(--blue); color:var(--ink); border:var(--b); box-shadow:var(--shadow-sm); padding:8px 16px; cursor:pointer; transition:transform .08s, box-shadow .08s; }
   .btn:hover { transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
@@ -50,7 +55,7 @@
   .btn.sm { padding:4px 10px; font-size:13px; }
   input, textarea, select { width:100%; font:500 15px "Space Grotesk", sans-serif; background:var(--white); color:var(--ink); border:var(--b); padding:8px 10px; outline:none; }
   input:focus, textarea:focus, select:focus { background:#fffbe0; box-shadow:var(--shadow-sm); }
-  input[type=checkbox] { width:22px; height:22px; accent-color:var(--ink); vertical-align:middle; }
+  input[type=checkbox], input[type=radio] { flex:0 0 auto; width:22px; height:22px; accent-color:var(--ink); vertical-align:middle; }
   textarea { min-height:120px; font-family:ui-monospace, Consolas, monospace; font-size:13px; }
   label { display:block; font-weight:700; font-size:14px; margin:14px 0 6px; }
   .hint { font-size:13px; color:#555; margin:4px 0 0; }
@@ -86,6 +91,8 @@
   <nav>
     <button data-tab="posts" class="active">📝 Posts</button>
     <button data-tab="write">⚡ Write now</button>
+    <button data-tab="folder">📁 Folder → post</button>
+    <button data-tab="connections">🔌 Connections</button>
     <button data-tab="profile">🙋 My profile</button>
     <button data-tab="settings">⚙️ Settings</button>
     <button data-tab="status">📡 Status</button>
@@ -111,6 +118,45 @@
       <div class="row"><button class="btn green" onclick="generate()">⚡ Write it</button></div>
       <p class="hint">Takes 1-3 minutes. The post appears in Posts and on Telegram.</p>
     </div>
+  </section>
+
+  <!-- FOLDER -> POST -->
+  <section id="folder" class="tab">
+    <div class="grid2">
+      <div class="card">
+        <div class="tag-title bg-lime">📁 Folder → post</div>
+        <p class="hint">Point the agent at a folder of certificates, badges, project screenshots or event photos
+          (JPG, PNG, WEBP, PDF). It reads every file, writes the post(s) and sends them for your approval.</p>
+        <label>Folder path on this computer</label>
+        <div class="row" style="margin-top:0"><input class="grow" id="fPath" placeholder="D:\Certificates">
+          <button class="btn white" onclick="scanFolder()">🔍 Check folder</button></div>
+        <div id="fFiles" class="hint"></div>
+        <label>What should the agent do?</label>
+        <textarea id="fInstr" style="min-height:110px;font-family:inherit;font-size:15px" placeholder="e.g. Share all my certificates in one LinkedIn post. Group them by skill, thank the issuers, keep it humble."></textarea>
+        <div class="row" id="fExamples"></div>
+      </div>
+      <div class="card">
+        <div class="tag-title bg-blue">⚙️ How to post</div>
+        <label>Post to</label><div class="row" id="fTargets"></div>
+        <label>Mode</label>
+        <label class="switch"><input type="radio" name="fMode" value="combined" checked> One post with all images (max 20 per post)</label>
+        <label class="switch"><input type="radio" name="fMode" value="series"> A series: one post per file, spaced out</label>
+        <div class="row"><div class="grow"><label>Hours between posts (series)</label><input id="fInterval" type="number" min="1" value="24"></div>
+          <div class="grow"><label>Start at (empty = now)</label><input id="fStart" type="datetime-local"></div></div>
+        <label>Agent role for this job</label><select id="fRole"></select>
+        <label>Extra instructions for the role (optional)</label><input id="fCustom" placeholder="e.g. write for recruiters in the cloud industry">
+        <div class="row"><button class="btn green" onclick="runFolder()">🚀 Inspect & write posts</button></div>
+        <p class="hint">Posts follow your mode: Approval mode waits for you (Telegram + Posts tab), Auto mode publishes on schedule.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONNECTIONS -->
+  <section id="connections" class="tab">
+    <div class="card"><div class="tag-title bg-yellow">🔌 Connections</div>
+      <p class="hint">Connect your platforms. LinkedIn uses its official login (you sign in on LinkedIn's own page), so CreatorOS never sees your password.
+        Keys saved here are stored only on this computer (data/connections.json). Values in .env take priority.</p></div>
+    <div class="grid2" id="connGrid"></div>
   </section>
 
   <!-- PROFILE -->
@@ -151,6 +197,15 @@
 
   <!-- SETTINGS -->
   <section id="settings" class="tab">
+    <div class="card">
+      <div class="tag-title bg-pink">🎭 Agent role</div>
+      <p class="hint">How the agent thinks and writes. Pick a ready-made role, or choose "Custom" and describe your own.</p>
+      <div class="row"><div class="grow"><label>Role</label><select id="pRole" onchange="showRoleHelp()"></select></div></div>
+      <p class="hint" id="pRoleHelp"></p>
+      <label>Your own instructions (custom role, or extra rules on top of the chosen role)</label>
+      <textarea id="pCustom" style="min-height:80px;font-family:inherit;font-size:15px" placeholder="e.g. Always write for Indian tech students; end every post with a practical tip."></textarea>
+    </div>
+
     <div class="card">
       <div class="tag-title bg-yellow">🗓️ Daily schedule</div>
       <div class="row">
@@ -239,8 +294,80 @@ async function safe(fn) { try { await fn(); } catch (e) { toast(e.message, true)
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav button, .tab").forEach(x => x.classList.remove("active"));
   b.classList.add("active"); $(b.dataset.tab).classList.add("active");
-  ({ profile: loadProfile, status: loadStatus, settings: loadSettings })[b.dataset.tab]?.();
+  ({ profile: loadProfile, status: loadStatus, settings: loadSettings, folder: loadFolder, connections: loadConnections })[b.dataset.tab]?.();
 });
+function openTab(name) { document.querySelector(`nav button[data-tab=${name}]`).click(); }
+
+/* ---------------- roles ---------------- */
+let PERSONAS = [];
+async function loadPersonas() { if (!PERSONAS.length) PERSONAS = (await api("/api/personas")).personas; return PERSONAS; }
+function showRoleHelp() { const p = PERSONAS.find(x => x.id === $("pRole").value); $("pRoleHelp").textContent = p?.prompt || "Describe the role below."; }
+
+/* ---------------- folder -> post ---------------- */
+const EXAMPLES = [
+  ["🎓 All certificates, one post", "Share all my certificates in one LinkedIn post. Group them by skill, thank the issuers, keep it humble and genuine."],
+  ["📅 One certificate a day", "Post one certificate per day. For each, say what I learned and how I'll use it."],
+  ["🛠️ Project showcase", "These are screenshots of my project. Explain what it does, the tech stack, and what I learned building it."],
+  ["🎤 Event recap", "These photos are from an event I attended. Share key takeaways and thank the organisers."],
+];
+async function loadFolder() {
+  const [ps, st] = [await loadPersonas(), await api("/api/settings")];
+  $("fRole").innerHTML = `<option value="">Use my default role</option>` + ps.filter(p => p.id !== "custom").map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join("");
+  $("fTargets").innerHTML = st.publishers.filter(t => t !== "medium" && t !== "devto").map(t => `<label class="switch"><input type="checkbox" class="f-t" value="${t}" ${t === "linkedin" ? "checked" : ""}> ${t}</label>`).join("");
+  $("fExamples").innerHTML = EXAMPLES.map((e, i) => `<button class="chip" onclick="$('fInstr').value = EXAMPLES[${i}][1]">${e[0]}</button>`).join("");
+}
+const scanFolder = () => safe(async () => {
+  const r = await api("/api/folder/scan", "POST", { folder: $("fPath").value.trim() });
+  $("fFiles").innerHTML = `<b>${r.count} file(s):</b> ${r.files.map(esc).join(", ")}`;
+});
+const runFolder = () => safe(async () => {
+  const body = {
+    folder: $("fPath").value.trim(), instructions: $("fInstr").value.trim(),
+    targets: [...document.querySelectorAll(".f-t:checked")].map(i => i.value),
+    mode: document.querySelector("input[name=fMode]:checked").value,
+    interval_hours: +$("fInterval").value || 24, start_at: $("fStart").value || null,
+    role: $("fRole").value || null, custom_role: $("fCustom").value.trim() || null,
+  };
+  if (!body.folder) return toast("Enter a folder path", true);
+  if (!body.targets.length) return toast("Choose where to post", true);
+  const r = await api("/api/folder/run", "POST", body);
+  toast(r.message); setTimeout(() => { openTab("posts"); }, 4000);
+});
+
+/* ---------------- connections ---------------- */
+async function loadConnections() {
+  const list = await api("/api/connections");
+  $("connGrid").innerHTML = list.map(c => {
+    const fields = c.fields.map(f => `<label>${esc(f.name)} ${f.set ? `<span class="badge s-published">set${f.source === "env" ? " in .env" : ""}</span>` : ""}</label>
+      <input type="password" class="c-f" data-p="${c.id}" data-name="${esc(f.name)}" placeholder="${f.set ? esc(f.masked) + " (leave empty to keep)" : "paste here"}" ${f.source === "env" && f.set ? "disabled" : ""}>`).join("");
+    let extra = "";
+    if (c.id === "linkedin") {
+      const o = c.oauth || {};
+      extra = `<label>Redirect URL to add in your LinkedIn app</label>
+        <div class="row" style="margin-top:0"><input class="grow" value="${esc(c.redirect_uri)}" readonly onclick="this.select()"></div>
+        <div class="row">${o.connected
+          ? `<span class="badge s-published">✔ connected as ${esc(o.name)} · ${o.days_left} days left</span>
+             <button class="btn white sm" onclick="location.href='/api/connections/linkedin/start'">Reconnect</button>
+             <button class="btn red sm" onclick="disconnectLinkedIn()">Disconnect</button>`
+          : `<button class="btn pink" onclick="connectLinkedIn()" ${c.ready ? "" : "disabled title='Save Client ID and Secret first'"}>🔗 Connect with LinkedIn</button>`}</div>`;
+    }
+    const status = c.id === "linkedin" ? (c.oauth?.connected ? "connected" : "not connected") : (c.ready ? "ready" : "not set");
+    return `<div class="card"><div class="row" style="justify-content:space-between;margin-top:0"><h3 style="margin:0">${esc(c.label)}</h3>
+      <span class="badge ${status === "ready" || status === "connected" ? "s-published" : "s-pending"}">${status}</span></div>
+      <p class="hint">${esc(c.help)}</p>${fields}
+      <div class="row"><button class="btn green sm" onclick="saveConn('${c.id}')">Save</button></div>${extra}</div>`;
+  }).join("");
+}
+const saveConn = id => safe(async () => {
+  const values = {}; document.querySelectorAll(`.c-f[data-p=${id}]`).forEach(i => { if (i.value.trim()) values[i.dataset.name] = i.value.trim(); });
+  if (!Object.keys(values).length) return toast("Nothing to save", true);
+  await api(`/api/connections/${id}`, "PUT", { values }); toast("Saved"); loadConnections();
+});
+function connectLinkedIn() {
+  if (location.hostname !== "localhost") toast("Tip: open the dashboard as http://localhost:8787 so the redirect URL matches your LinkedIn app", true);
+  location.href = "/api/connections/linkedin/start";
+}
+const disconnectLinkedIn = () => safe(async () => { if (confirm("Disconnect LinkedIn?")) { await api("/api/connections/linkedin/disconnect", "POST"); loadConnections(); } });
 
 /* ---------------- posts ---------------- */
 async function loadPosts() {
@@ -255,11 +382,17 @@ async function openPost(id) {
   current = id; loadPosts();
   const p = await api(`/api/posts/${id}`);
   const links = Object.entries(p.published || {}).map(([k, v]) => `<div><b>${esc(k)}:</b> <a href="${esc(v)}" target="_blank">${esc(v)}</a></div>`).join("");
+  const social = p.kind === "social";
+  const thumbs = (p.media || []).map(m => `<img src="/api/media?path=${encodeURIComponent(m.path)}" alt="${esc(m.alt)}" title="${esc(m.alt)}">`).join("");
+  const when = p.scheduled_at ? `<span class="badge bg-purple">🗓️ ${esc(p.scheduled_at.replace("T", " "))}</span>` : "";
+  const to = (p.targets || []).length ? `<span class="badge bg-blue">→ ${esc(p.targets.join(", "))}</span>` : "";
   $("postView").innerHTML = `
-    <div class="row"><span class="badge s-${p.status}">${p.status}</span><span>${esc(p.angle)} · ${esc(p.topic)}</span></div>
+    <div class="row"><span class="badge s-${p.status}">${p.status}</span>${to}${when}<span>${esc(p.angle)} · ${esc(p.topic)}</span></div>
     ${p.error ? `<p class="badge s-failed">${esc(p.error)}</p>` : ""}${links}
+    ${thumbs ? `<div class="thumbs">${thumbs}</div>` : ""}
     <div class="row">
-      <button class="btn green" onclick="act('publish')">✅ Publish</button>
+      <button class="btn green" onclick="act('approve')">✅ Approve${p.scheduled_at && new Date(p.scheduled_at) > new Date() ? " (on schedule)" : " & publish"}</button>
+      ${p.status === "scheduled" ? `<button class="btn yellow" onclick="act('publish')">⚡ Publish now</button>` : ""}
       <button class="btn white" onclick="toggleEdit()">✏️ Edit text</button>
       <button class="btn red" onclick="act('reject')">❌ Skip</button>
     </div>
@@ -271,13 +404,18 @@ async function openPost(id) {
       <label>Body (Markdown)</label><textarea id="eBody" style="min-height:400px">${esc(p.body)}</textarea>
       <div class="row"><button class="btn green" onclick="saveEdit()">Save</button></div>
     </div>
-    <div class="preview"><h1>${esc(p.title)}</h1><p><i>${esc(p.subtitle)}</i></p>
-      <p>${(p.tags || []).map(t => `<span class="badge bg-yellow">${esc(t)}</span>`).join(" ")}</p>${md(p.body)}</div>`;
+    ${social
+      ? `<div class="preview"><h2>${esc(p.title)}</h2><div style="white-space:pre-wrap">${esc(p.body)}</div></div>`
+      : `<div class="preview"><h1>${esc(p.title)}</h1><p><i>${esc(p.subtitle)}</i></p>
+      <p>${(p.tags || []).map(t => `<span class="badge bg-yellow">${esc(t)}</span>`).join(" ")}</p>${md(p.body)}</div>`}`;
 }
 function toggleEdit() { const b = $("editBox"); b.style.display = b.style.display === "none" ? "block" : "none"; }
 const act = what => safe(async () => {
-  if (what === "publish" && !confirm("Publish this post now?")) return;
-  await api(`/api/posts/${current}/${what}`, "POST"); toast(what === "publish" ? "Published - check the links" : "Skipped"); openPost(current);
+  if (what === "publish" && !confirm("Publish this post right now?")) return;
+  const r = await api(`/api/posts/${current}/${what}`, "POST");
+  toast({ approve: r.status === "scheduled" ? "Approved - it will publish on schedule" : "Published - check the links",
+          publish: "Published - check the links", reject: "Skipped" }[what]);
+  openPost(current);
 });
 const revise = () => safe(async () => {
   const instructions = $("instr").value.trim(); if (!instructions) return;
@@ -371,6 +509,9 @@ function modelBlock(role, m, providers) {
 }
 async function loadSettings() {
   const r = await api("/api/settings"); S = r.settings; ANGLES = r.angles;
+  const ps = await loadPersonas();
+  $("pRole").innerHTML = ps.map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join("");
+  $("pRole").value = S.persona?.role || "tech_blogger"; $("pCustom").value = S.persona?.custom || ""; showRoleHelp();
   const b = S.blog, src = b.sources || {}, pub = S.publish || {};
   $("tz").value = S.timezone || "";
   $("slots").innerHTML = (b.schedule || []).map(slotRow).join("");
@@ -399,6 +540,7 @@ const saveSettings = () => safe(async () => {
   document.querySelectorAll(".p-url").forEach(i => providers[i.dataset.name].base_url = i.value.trim());
   const model = role => { const m = { provider: $(`${role}-prov`).value, model: $(`${role}-model`).value.trim() }; const e = $(`${role}-effort`).value; if (e) m.effort = e; return m; };
   const body = {
+    persona: { role: $("pRole").value, custom: $("pCustom").value.trim() },
     timezone: $("tz").value.trim(),
     models: { writer: model("writer"), scout: model("scout") },
     providers,
@@ -463,6 +605,10 @@ const togglePause = () => safe(async () => {
   $("angle").innerHTML = s.angles.map(a => `<option>${esc(a)}</option>`).join("");
   ANGLES = Object.fromEntries(s.angles.map(a => [a, {}]));
   loadPosts(); setInterval(loadPosts, 30000);
+  const q = new URLSearchParams(location.search);
+  if (q.get("connected")) { toast("✔ Connected: " + q.get("connected")); openTab("connections"); }
+  if (q.get("error")) { toast(q.get("error"), true); openTab("connections"); }
+  if (q.get("connected") || q.get("error")) history.replaceState(null, "", location.pathname + (TOKEN ? "?token=" + TOKEN : ""));
 }))();
 </script>
 </body>

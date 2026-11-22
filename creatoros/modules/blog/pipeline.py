@@ -1,11 +1,12 @@
 """The full blog flow: scout -> pick -> research -> write -> save -> ask for approval -> publish."""
 
 import re
+from datetime import datetime
 
 from ... import db, notify
 from ...config import BLOG_OUTPUT, log
 from ...llm import LLMError, get_llm
-from ...profile import next_unused_note, profile_prompt
+from ...profile import author_context, next_unused_note
 from ...publishers import publish_to
 from . import research, scout, writer
 
@@ -39,7 +40,7 @@ def generate_post(cfg: dict, angle: str = "news", topic_hint: str | None = None,
             angle = "future"
 
     writer_llm = get_llm(cfg, "writer")
-    profile_text = profile_prompt()
+    profile_text = author_context(cfg)
 
     if note:
         topic, sources, used_keys = f"The author's note '{note['name']}'", [], [f"note:{note['name']}"]
@@ -76,12 +77,36 @@ def generate_post(cfg: dict, angle: str = "news", topic_hint: str | None = None,
     return post_id
 
 
+def approve(cfg: dict, post_id: int) -> str:
+    """Approve a post: publish now, or keep it until its scheduled time (series posts)."""
+    post = db.get_post(post_id)
+    if not post:
+        raise ValueError(f"Post #{post_id} not found")
+    when = post.get("scheduled_at")
+    if when and datetime.fromisoformat(when) > datetime.now():
+        db.update_post(post_id, status="scheduled")
+        notify.send_text(f"🗓️ #{post_id} approved, it will be published at {when.replace('T', ' ')}.")
+        return "scheduled"
+    publish_post(cfg, post_id)
+    return db.get_post(post_id)["status"]
+
+
+def publish_due(cfg: dict) -> None:
+    """Publish approved posts whose scheduled time has come (runs every few minutes)."""
+    if cfg.get("paused"):
+        return
+    for post in db.due_scheduled(datetime.now().isoformat(timespec="seconds")):
+        log.info("Scheduled post #%d is due", post["id"])
+        publish_post(cfg, post["id"])
+
+
 def publish_post(cfg: dict, post_id: int) -> dict:
     post = db.get_post(post_id)
     if not post:
         raise ValueError(f"Post #{post_id} not found")
     results, errors = dict(post.get("published") or {}), []
-    for target in cfg.get("publish", {}).get("targets", ["markdown"]):
+    targets = post.get("targets") or cfg.get("publish", {}).get("targets", ["markdown"])
+    for target in targets:
         if target in results:
             continue  # already published there
         try:
@@ -98,7 +123,11 @@ def publish_post(cfg: dict, post_id: int) -> dict:
 
 def revise(cfg: dict, post_id: int, instructions: str) -> None:
     post = db.get_post(post_id)
-    new = writer.revise_post(get_llm(cfg, "writer"), post, instructions, profile_prompt())
+    if post.get("kind") == "social":
+        from ..social import folder
+        new = folder.revise(get_llm(cfg, "writer"), post, instructions, author_context(cfg))
+    else:
+        new = writer.revise_post(get_llm(cfg, "writer"), post, instructions, author_context(cfg))
     db.update_post(post_id, **new, status="pending")
     updated = db.get_post(post_id)
     save_markdown(updated)
