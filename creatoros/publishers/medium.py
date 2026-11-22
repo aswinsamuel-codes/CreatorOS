@@ -10,7 +10,8 @@ API = "https://api.medium.com/v1"
 def _headers() -> dict:
     token = env("MEDIUM_TOKEN")
     if not token:
-        raise RuntimeError("MEDIUM_TOKEN is not set in .env")
+        raise RuntimeError("Medium isn't connected (most accounts no longer get API tokens). "
+                           "Use '📋 Copy for Medium' on the post, or remove Medium from Settings → Publish to.")
     return {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",

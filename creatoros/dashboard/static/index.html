@@ -756,6 +756,7 @@ async function openPost(id) {
       ${p.status === "scheduled" ? `<button class="btn yellow" onclick="act('publish')">⚡ Publish now</button>` : ""}
       <button class="btn white" onclick="toggleEdit()">✏️ Edit text</button>
       <button class="btn yellow" onclick="openRepurpose(${p.id})">♻️ Repurpose</button>
+      ${p.kind === "blog" ? `<button class="btn white" onclick="copyForMedium(${p.id})" title="Copies the formatted post and opens Medium's editor - paste with Ctrl+V">📋 Copy for Medium</button>` : ""}
       <button class="btn red" onclick="act('reject')">❌ Skip</button>
     </div>
     <div class="row"><input class="grow" id="instr" placeholder="Ask the AI to change it, e.g. 'more casual, add an example'"><button class="btn pink" onclick="revise()">🔁 Rewrite</button></div>
@@ -780,6 +781,33 @@ async function openPost(id) {
       : `<div class="preview"><h1>${esc(p.title)}</h1><p><i>${esc(p.subtitle)}</i></p>
       <p>${(p.tags || []).map(t => `<span class="badge bg-yellow">${esc(t)}</span>`).join(" ")}</p>${md(p.body)}</div>`}`;
 }
+/* Medium no longer gives API tokens to most accounts, so: copy rich text + open the editor. */
+const copyForMedium = id => safe(async () => {
+  const p = await api(`/api/posts/${id}`);
+  const tags = (p.tags || []).slice(0, 5);
+  const html = `<h1>${esc(p.title)}</h1>${p.subtitle ? `<h2>${esc(p.subtitle)}</h2>` : ""}${window.marked ? marked.parse(p.body) : `<pre>${esc(p.body)}</pre>`}`;
+  const text = `${p.title}\n\n${p.subtitle || ""}\n\n${p.body}`;
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html": new Blob([html], { type: "text/html" }), "text/plain": new Blob([text], { type: "text/plain" }) })]);
+  } catch {
+    await navigator.clipboard.writeText(text);
+  }
+  window.open("https://medium.com/new-story", "_blank");
+  openModal(`<h2 style="margin-top:0">📋 Copied - now paste it into Medium</h2>
+    <ol class="steps">
+      <li>In the Medium tab that just opened, click into the editor and press <b>Ctrl+V</b> (headings, bold, lists and links come along).</li>
+      <li>Click <b>Publish</b> and add these tags: <b>${tags.map(esc).join(", ") || "-"}</b></li>
+      <li>Come back here and click <b>Mark as posted on Medium</b> so CreatorOS keeps track.</li>
+    </ol>
+    <label>Medium link (optional)</label><input id="mediumUrl" placeholder="https://medium.com/@you/...">
+    <div class="row"><button class="btn green" onclick="markMedium(${id})">✔ Mark as posted on Medium</button>
+      <button class="btn white" onclick="window.open('https://medium.com/new-story', '_blank')">Open Medium again</button></div>`);
+});
+const markMedium = id => safe(async () => {
+  await api(`/api/posts/${id}/manual-published`, "POST", { platform: "medium", url: $("mediumUrl").value.trim() });
+  $("modalBg").classList.remove("open"); toast("Marked as posted on Medium ✔"); openPost(id);
+});
 function toggleEdit() { const b = $("editBox"); b.style.display = b.style.display === "none" ? "block" : "none"; }
 const act = what => safe(async () => {
   if (what === "publish" && !confirm("Publish this post right now?")) return;

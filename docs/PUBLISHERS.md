@@ -7,12 +7,20 @@ publish:
 
 | Target | Setup | Notes |
 |---|---|---|
-| `medium` | `MEDIUM_TOKEN` in `.env` | Medium → Settings → Security and apps → **Integration tokens**. Medium no longer gives new tokens to every account; if the option is missing, use `markdown` and import with https://medium.com/p/import. Up to 5 tags. `publish_status`: `draft`, `public`, `unlisted`. |
+| `medium` | Connections → Medium (integration token) — **or "📋 Copy for Medium"** | Medium → Settings → Security and apps → **Integration tokens**. Medium no longer gives new tokens to every account; if the option is missing, use `markdown` and import with https://medium.com/p/import. Up to 5 tags. `publish_status`: `draft`, `public`, `unlisted`. |
 | `devto` | `DEVTO_API_KEY` in `.env` | dev.to → Settings → Extensions → API keys. Up to 4 tags (letters and numbers only). With `canonical_url_from_medium: true` and `medium` listed first, the dev.to post points to Medium as the original, which is good for SEO. |
 | `linkedin` | Connections tab → Connect with LinkedIn ([guide](CONNECTIONS.md)) | Official API. Text, 1 image or 2-20 images. For blog posts it shares the title, subtitle and link. |
 | `markdown` | none | Writes front-matter Markdown to `workspace/output/blog/published/`, ready for Hugo, Jekyll, Astro or a manual import. |
 
 Every generated post is also saved to `workspace/output/blog/` whatever the targets are.
+
+## Medium without a token (most accounts)
+
+Medium stopped issuing integration tokens, so most accounts can't be posted to by any app.
+On any blog post in the Posts tab, click **📋 Copy for Medium**: CreatorOS copies the post with
+its formatting (title, subtitle, headings, bold, lists, links) and opens Medium's editor. Press
+**Ctrl+V**, add the suggested tags and click Publish. Then click **Mark as posted on Medium** (and
+paste the link if you like) so CreatorOS shows it as published.
 
 ## Where to post for reach (tech audiences)
 

@@ -64,10 +64,12 @@ def _add_slots(sched: BackgroundScheduler, cfg: dict) -> None:
 def start(cfg: dict) -> BackgroundScheduler:
     sched = BackgroundScheduler(timezone=cfg.get("timezone") or None)
     _add_slots(sched, cfg)
-    sched.add_job(_auto_publish, "interval", minutes=5, args=[cfg], id="auto-publish")
-    sched.add_job(_publish_due, "interval", minutes=2, args=[cfg], id="publish-due")
+    # Background checks: if the PC slept, just run once when it wakes (no "missed" warnings).
+    bg = {"misfire_grace_time": 3600, "coalesce": True, "max_instances": 1}
+    sched.add_job(_auto_publish, "interval", minutes=5, args=[cfg], id="auto-publish", **bg)
+    sched.add_job(_publish_due, "interval", minutes=2, args=[cfg], id="publish-due", **bg)
     sched.add_job(_marketing, "interval", minutes=30, args=[cfg], id="marketing",
-                  next_run_time=datetime.now() + timedelta(minutes=1))
+                  next_run_time=datetime.now() + timedelta(minutes=1), **bg)
     sched.start()
     for run in next_runs(sched):
         log.info("Scheduled %s (%s) -> next run %s", run["time"], run["angle"], run["next"])

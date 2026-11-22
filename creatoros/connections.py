@@ -90,8 +90,10 @@ PLATFORMS = {
         "fields": [{"name": "MEDIUM_TOKEN", "label": "Integration token"}],
         "steps": [
             ["Open Medium settings → 'Security and apps'", "https://medium.com/me/settings/security"],
-            ["Under 'Integration tokens', create a token named CreatorOS and copy it (if you don't see this option, Medium no longer offers tokens to your account - use dev.to or the Markdown export instead)"],
-            ["Paste it below, Save, then Test"],
+            ["Look for 'Integration tokens'. Most newer accounts DON'T have it - Medium stopped giving API "
+             "tokens. No token? Skip the rest: open any blog post in Posts and click '📋 Copy for Medium' - "
+             "it copies the formatted post and opens Medium's editor, you just press Ctrl+V and Publish."],
+            ["If you do have 'Integration tokens': create one named CreatorOS, paste it below, Save, then Test"],
         ],
     },
     "devto": {

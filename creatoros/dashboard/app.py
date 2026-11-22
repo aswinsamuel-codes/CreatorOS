@@ -144,6 +144,16 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
         pipeline.save_markdown(db.get_post(post_id))
         return {"ok": True}
 
+    @app.post("/api/posts/{post_id}/manual-published")
+    def manual_published(post_id: int, data: dict = Body(...)):
+        """Record a post you published yourself (e.g. pasted into Medium)."""
+        p = _post(post_id)
+        platform = (data.get("platform") or "manual")[:30]
+        url = (data.get("url") or "").strip()[:500] or f"posted manually on {platform}"
+        db.update_post(post_id, status="published", published={**(p.get("published") or {}), platform: url},
+                       error=None)
+        return {"ok": True}
+
     @app.post("/api/posts/{post_id}/approve")
     def approve(post_id: int):
         _post(post_id)

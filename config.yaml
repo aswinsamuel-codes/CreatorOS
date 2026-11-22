@@ -106,7 +106,9 @@ paused: false     # true = scheduled slots are skipped until you resume
 # Medium publish_status: draft | public | unlisted   (start with draft while testing!)
 # ---------------------------------------------------------------------------
 publish:
-  targets: [medium]
+  # markdown always works (saves the post as a file). Add devto / linkedin / medium once connected.
+  # No Medium token? Use the "📋 Copy for Medium" button on each post instead.
+  targets: [markdown]
   medium: { publish_status: draft, notify_followers: false }
   devto: { published: false }
   linkedin: { visibility: PUBLIC, api_version: "202610" }   # PUBLIC or CONNECTIONS
