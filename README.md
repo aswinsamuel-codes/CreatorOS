@@ -1,5 +1,10 @@
 # CreatorOS
 
+[![CI](https://github.com/aswinsamuel-codes/CreatorOS/actions/workflows/ci.yml/badge.svg)](https://github.com/aswinsamuel-codes/CreatorOS/actions/workflows/ci.yml)
+![Docker](https://img.shields.io/badge/docker-ready-2496ED?logo=docker&logoColor=white)
+![Python](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 An open-source AI content studio that runs on your own machine. It finds the day's most
 interesting tech stories, writes posts in **your** voice, asks for your approval on
 Telegram or a local dashboard, and publishes them to Medium (and more).
@@ -68,7 +73,18 @@ Built-in post types: `news`, `future` (question-led), `business` (opportunities)
 Default daily schedule: 09:00 news · 12:00 future · 15:00 news · 18:00 business ·
 21:00 personal.
 
-## Setup
+## Quick start with Docker (recommended)
+
+```bash
+git clone https://github.com/aswinsamuel-codes/CreatorOS
+cd CreatorOS
+docker compose up -d
+```
+
+Open http://localhost:8787 and connect your platforms on the Connections tab. Your data stays in
+`data/`, `workspace/`, `profile/` and `logs/` next to the compose file. See [docs/DOCKER.md](docs/DOCKER.md).
+
+## Setup without Docker
 
 ```powershell
 python -m venv .venv
@@ -139,6 +155,7 @@ open `http://<host>:8787/?token=<your token>`.
 
 | Doc | Covers |
 |---|---|
+| [Docker](docs/DOCKER.md) | Running with Docker Compose, volumes, local AI, CI and image builds |
 | [Architecture](docs/ARCHITECTURE.md) | How the pipeline, scheduler, bot and dashboard fit together |
 | [Configuration](docs/CONFIGURATION.md) | Modes, schedule, custom post types, sources, every setting |
 | [Models](docs/MODELS.md) | Claude, Ollama/local clusters, OpenAI, Gemini and more |

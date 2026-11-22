@@ -1,0 +1,48 @@
+# CreatorOS with Docker Compose
+#
+#   docker compose up -d                      # start (builds the image the first time)
+#   docker compose logs -f                    # watch logs
+#   docker compose down                       # stop
+#   docker compose --profile local-ai up -d   # also start a local Ollama model server
+#
+# Then open http://localhost:8787 and connect your platforms on the Connections tab.
+
+services:
+  creatoros:
+    build: .
+    image: ghcr.io/aswinsamuel-codes/creatoros:latest
+    container_name: creatoros
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8787:8787"        # only this computer; see docs/DOCKER.md to open it to your network
+    env_file:
+      - path: .env                   # optional: keys can also be added in the dashboard
+        required: false
+    environment:
+      TZ: ${TZ:-UTC}                 # your timezone for the daily schedule, e.g. TZ=Asia/Kolkata in .env
+    volumes:
+      - ./data:/app/data             # database, connections, your settings (config.local.yaml)
+      - ./workspace:/app/workspace   # generated posts and media
+      - ./profile:/app/profile       # your profile, notes and documents
+      - ./logs:/app/logs
+      # Folders for "Folder → post" and "Video → post" (use the container path in the dashboard):
+      # - D:/Certificates:/media/certificates:ro
+      # - D:/Videos:/media/videos:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach Ollama/LM Studio running on your computer
+
+  # Optional local AI models: docker compose --profile local-ai up -d
+  # Then set the Ollama provider URL to http://ollama:11434/v1 (Settings → Models → Providers)
+  # and pull a model: docker compose exec ollama ollama pull gemma3:12b
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["local-ai"]
+    container_name: creatoros-ollama
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+
+volumes:
+  ollama:

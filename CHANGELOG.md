@@ -5,6 +5,14 @@ All notable changes are listed here. The project follows [Semantic Versioning](h
 ## [Unreleased]
 
 ### Added
+- **Docker support**: multi-stage `Dockerfile` (slim runtime, non-root user, health check, FFmpeg),
+  `docker-compose.yml` with data volumes, optional local Ollama service (`--profile local-ai`),
+  `.dockerignore` that keeps secrets and personal data out of the image.
+  `CREATOROS_HOST`, `CREATOROS_PORT` and `CREATOROS_LOCAL_CONFIG` environment overrides.
+- **GitHub Actions**: CI runs the tests, builds the image and smoke-tests the container on every
+  push; version tags publish multi-arch images (amd64/arm64) to GitHub Container Registry.
+- **📋 Copy for Medium**: copies the formatted post and opens Medium's editor (for accounts without
+  integration tokens), plus "Mark as posted on Medium".
 - **Google Gemini** and **OpenAI** tiles on the Connections tab, with guided steps and a Test
   that checks the key really has quota.
 - **Use this AI**: choose a model from your account and use it for writing and/or picking

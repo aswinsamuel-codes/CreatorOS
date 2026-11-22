@@ -12,6 +12,7 @@
 """
 
 import argparse
+import os
 import shutil
 import sys
 import threading
@@ -131,7 +132,9 @@ def cmd_run(cfg, args):
     else:
         log.info("Telegram not configured - approve posts in the dashboard")
     d = cfg.get("dashboard", {})
-    host, port = d.get("host", "127.0.0.1"), d.get("port", 8787)
+    # CREATOROS_HOST / CREATOROS_PORT override the config (Docker sets the host to 0.0.0.0).
+    host = os.environ.get("CREATOROS_HOST") or d.get("host", "127.0.0.1")
+    port = int(os.environ.get("CREATOROS_PORT") or d.get("port", 8787))
     url = f"http://{'localhost' if host in ('127.0.0.1', '0.0.0.0') else host}:{port}"
     log.info("Dashboard: %s", url)
     if not getattr(args, "no_browser", False):

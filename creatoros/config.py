@@ -28,7 +28,8 @@ def setup_logging() -> None:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
-LOCAL_CONFIG = ROOT / "config.local.yaml"
+# In Docker this points into the data volume so your settings survive container rebuilds.
+LOCAL_CONFIG = Path(os.environ.get("CREATOROS_LOCAL_CONFIG") or ROOT / "config.local.yaml")
 
 # Sections the dashboard is allowed to change (secrets always stay in .env).
 EDITABLE_SECTIONS = ("models", "providers", "blog", "approval", "publish", "dashboard", "timezone", "paused",
