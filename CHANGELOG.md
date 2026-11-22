@@ -9,6 +9,8 @@ All notable changes are listed here. The project follows [Semantic Versioning](h
   splash screen, tray icon (open, open in browser, start at login, quit), close-to-tray, single
   instance, data in the user app-data folder, clean engine shutdown.
 - **Logo** (neo-brutalist C + spark): app icons, dashboard header, favicon, README.
+- **Opening animation**: the tile drops in, the C draws itself, the spark pops, the wordmark
+  stamps in, then the app zooms into the dashboard (respects "reduce motion").
 - CI compiles and lints the Rust app on every push; version tags build installers on all three
   platforms, smoke-test the packaged engine and attach installers to the GitHub Release.
 - `CREATOROS_HOME` (data folder separate from the app) and `POST /api/shutdown` (local only).
