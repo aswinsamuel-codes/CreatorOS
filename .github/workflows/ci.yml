@@ -25,6 +25,30 @@ jobs:
       - name: Run tests (fake model, no API keys needed)
         run: python tests/test_pipeline.py
 
+  desktop:
+    name: Desktop app compiles (Rust/Tauri)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux system libraries for Tauri
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+      - name: Placeholder engine binary (the real one is built on release tags)
+        run: |
+          TRIPLE=$(rustc -vV | sed -n 's/host: //p')
+          printf '#!/bin/sh\n' > "desktop/src-tauri/binaries/creatoros-engine-$TRIPLE"
+          chmod +x "desktop/src-tauri/binaries/creatoros-engine-$TRIPLE"
+      - name: cargo clippy
+        working-directory: desktop/src-tauri
+        run: cargo clippy --locked || cargo clippy
+
   docker:
     name: Docker build + smoke test
     runs-on: ubuntu-latest

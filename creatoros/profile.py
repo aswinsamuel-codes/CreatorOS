@@ -3,16 +3,17 @@
 import yaml
 
 from . import db
-from .config import PROFILE_DIR
+from .config import APP_DIR, PROFILE_DIR
 
 PROFILE_FILE = PROFILE_DIR / "profile.yaml"            # yours, ignored by git
-PROFILE_EXAMPLE = PROFILE_DIR / "profile.example.yaml"  # template, in git
+PROFILE_EXAMPLE = APP_DIR / "profile" / "profile.example.yaml"  # template, shipped with the app
 NOTES_DIR = PROFILE_DIR / "notes"
 
 
 def ensure_profile() -> None:
     """Create profile.yaml from the template on first run."""
     if not PROFILE_FILE.exists() and PROFILE_EXAMPLE.exists():
+        PROFILE_DIR.mkdir(parents=True, exist_ok=True)
         PROFILE_FILE.write_text(PROFILE_EXAMPLE.read_text(encoding="utf-8"), encoding="utf-8")
 
 

@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CreatorOS</title>
+<style>
+  :root { --ink:#111; --paper:#fff8e7; --yellow:#ffd23f; --pink:#ff6b9d; --lime:#b8ff5c; --red:#ff5252; }
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body { display:flex; align-items:center; justify-content:center; background:var(--paper); color:var(--ink);
+         font:16px/1.5 "Segoe UI", system-ui, sans-serif;
+         background-image: radial-gradient(var(--ink) 1px, transparent 1px); background-size: 22px 22px; }
+  .card { background:#fff; border:3px solid var(--ink); box-shadow:8px 8px 0 var(--ink); padding:36px 44px; text-align:center; width:min(460px, 90vw); }
+  img { width:120px; height:120px; }
+  h1 { font:900 34px "Arial Black", system-ui, sans-serif; margin:12px 0 4px; letter-spacing:-1px; }
+  h1 span { color:var(--pink); }
+  .bar { height:16px; border:3px solid var(--ink); margin:22px 0 10px; overflow:hidden; background:#fff; }
+  .bar div { height:100%; width:30%; background:var(--yellow); border-right:3px solid var(--ink); animation:slide 1.2s ease-in-out infinite alternate; }
+  @keyframes slide { from { margin-left:0 } to { margin-left:70% } }
+  .msg { font-weight:700; }
+  .hint { font-size:13px; color:#555; margin-top:10px; }
+  .err { background:var(--red); color:#fff; border:3px solid var(--ink); padding:10px; margin-top:16px; display:none; text-align:left; font-size:14px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <img src="logo.png" alt="CreatorOS logo">
+    <h1>Creator<span>OS</span></h1>
+    <div class="bar"><div></div></div>
+    <div class="msg" id="msg">Starting the CreatorOS engine…</div>
+    <div class="hint">The first start can take up to a minute.</div>
+    <div class="err" id="err">
+      The engine didn't start. Try quitting CreatorOS from the tray icon and opening it again.<br>
+      If port 8787 is used by another program, close it first. Logs are in your app-data folder under <b>CreatorOS/logs</b>.
+    </div>
+  </div>
+<script>
+  // Check the engine every second; open the dashboard as soon as it answers.
+  const URL = "http://127.0.0.1:8787";
+  const started = Date.now();
+  const steps = ["Starting the CreatorOS engine…", "Loading your workspace…", "Waking up the agents…", "Almost there…"];
+  let i = 0;
+  setInterval(() => { document.getElementById("msg").textContent = steps[Math.min(++i, steps.length - 1)]; }, 6000);
+  async function check() {
+    try {
+      await fetch(URL + "/api/status", { mode: "no-cors", cache: "no-store" });
+      location.replace(URL);
+      return;
+    } catch (e) { /* not ready yet */ }
+    if (Date.now() - started > 120000) document.getElementById("err").style.display = "block";
+    setTimeout(check, 1000);
+  }
+  check();
+</script>
+</body>
+</html>

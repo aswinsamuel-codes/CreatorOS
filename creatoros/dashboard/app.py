@@ -21,7 +21,7 @@ from ..personas import list_personas
 from ..publishers import linkedin, youtube
 
 OAUTH = {"linkedin": linkedin, "youtube": youtube}
-from ..config import (EDITABLE_SECTIONS, ROOT, deep_merge, env, load_config, log, read_local_config_text,
+from ..config import (APP_DIR, EDITABLE_SECTIONS, ROOT, deep_merge, env, load_config, log, read_local_config_text,
                       reset_local_config, save_local_config, write_local_config_text)
 from ..modules.blog import pipeline
 from ..modules.blog.angles import all_angles
@@ -63,6 +63,22 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
     @app.get("/")
     def index():
         return FileResponse(STATIC / "index.html")
+
+    @app.get("/static/{name}")
+    def static_file(name: str):
+        p = (STATIC / name).resolve()
+        if p.parent != STATIC.resolve() or not p.is_file() or p.suffix not in (".png", ".svg", ".ico"):
+            raise HTTPException(404, "not found")
+        return FileResponse(p)
+
+    @app.post("/api/shutdown")
+    def shutdown(request: Request):
+        """Lets the desktop app stop its engine cleanly (only from this computer)."""
+        if request.client and request.client.host not in ("127.0.0.1", "::1", "localhost"):
+            raise HTTPException(403, "only allowed from this computer")
+        log.info("Shutdown requested by the desktop app")
+        threading.Timer(0.5, lambda: os._exit(0)).start()
+        return {"ok": True}
 
     @app.get("/api/status")
     def status():
@@ -113,7 +129,7 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
         bad = [k for k in local if k not in EDITABLE_SECTIONS]
         if bad:
             raise HTTPException(400, f"These sections can't be set here: {', '.join(bad)}")
-        base = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8")) or {}
+        base = yaml.safe_load((APP_DIR / "config.yaml").read_text(encoding="utf-8")) or {}
         errors = validate(deep_merge(base, local))
         if errors:
             raise HTTPException(400, " • ".join(errors))

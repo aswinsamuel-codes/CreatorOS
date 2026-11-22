@@ -1,0 +1,25 @@
+[package]
+name = "creatoros"
+version = "0.6.0"
+description = "CreatorOS desktop app - runs the CreatorOS engine with a native window and tray icon"
+authors = ["CreatorOS contributors"]
+license = "MIT"
+repository = "https://github.com/aswinsamuel-codes/CreatorOS"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+ureq = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+panic = "abort"

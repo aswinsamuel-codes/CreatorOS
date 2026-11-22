@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo-256.png" width="140" alt="CreatorOS logo"></p>
+
 # CreatorOS
 
 [![CI](https://github.com/aswinsamuel-codes/CreatorOS/actions/workflows/ci.yml/badge.svg)](https://github.com/aswinsamuel-codes/CreatorOS/actions/workflows/ci.yml)
@@ -73,7 +75,13 @@ Built-in post types: `news`, `future` (question-led), `business` (opportunities)
 Default daily schedule: 09:00 news · 12:00 future · 15:00 news · 18:00 business ·
 21:00 personal.
 
-## Quick start with Docker (recommended)
+## Download the desktop app (easiest)
+
+Windows, macOS and Linux installers are attached to every
+[release](https://github.com/aswinsamuel-codes/CreatorOS/releases/latest). Install, open, done:
+the app runs the engine for you, sits in the tray and can start at login. See [docs/DESKTOP.md](docs/DESKTOP.md).
+
+## Quick start with Docker
 
 ```bash
 git clone https://github.com/aswinsamuel-codes/CreatorOS
@@ -155,6 +163,7 @@ open `http://<host>:8787/?token=<your token>`.
 
 | Doc | Covers |
 |---|---|
+| [Desktop app](docs/DESKTOP.md) | Installers, tray, start at login, how the Rust/Tauri app is built |
 | [Docker](docs/DOCKER.md) | Running with Docker Compose, volumes, local AI, CI and image builds |
 | [Architecture](docs/ARCHITECTURE.md) | How the pipeline, scheduler, bot and dashboard fit together |
 | [Configuration](docs/CONFIGURATION.md) | Modes, schedule, custom post types, sources, every setting |

@@ -1,0 +1,48 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "CreatorOS",
+  "version": "0.6.0",
+  "identifier": "io.github.aswinsamuel.creatoros",
+  "build": {
+    "frontendDist": "../splash"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [
+      {
+        "label": "main",
+        "title": "CreatorOS",
+        "url": "index.html",
+        "width": 1360,
+        "height": 880,
+        "minWidth": 900,
+        "minHeight": 600,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "CreatorOS contributors",
+    "copyright": "MIT License",
+    "category": "Productivity",
+    "shortDescription": "Open-source AI content studio",
+    "longDescription": "CreatorOS writes blogs, social posts, video metadata and marketing campaigns in your voice, and publishes them after your approval.",
+    "homepage": "https://github.com/aswinsamuel-codes/CreatorOS",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": ["binaries/creatoros-engine"],
+    "windows": {
+      "webviewInstallMode": { "type": "downloadBootstrapper" }
+    }
+  }
+}

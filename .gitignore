@@ -20,3 +20,11 @@ profile/profile.yaml
 profile/notes/*
 !profile/notes/README.md
 profile/documents/
+
+# Desktop app build output
+desktop/node_modules/
+desktop/engine/build/
+desktop/engine/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/src-tauri/binaries/creatoros-engine-*

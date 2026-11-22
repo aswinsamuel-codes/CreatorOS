@@ -2,6 +2,17 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Desktop app (Rust + Tauri)** for Windows, macOS and Linux: bundled engine (PyInstaller sidecar),
+  splash screen, tray icon (open, open in browser, start at login, quit), close-to-tray, single
+  instance, data in the user app-data folder, clean engine shutdown.
+- **Logo** (neo-brutalist C + spark): app icons, dashboard header, favicon, README.
+- CI compiles and lints the Rust app on every push; version tags build installers on all three
+  platforms, smoke-test the packaged engine and attach installers to the GitHub Release.
+- `CREATOROS_HOME` (data folder separate from the app) and `POST /api/shutdown` (local only).
+
 ## [0.5.0] - 2026-11-22
 
 ### Added

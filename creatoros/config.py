@@ -5,23 +5,28 @@ from pathlib import Path
 import yaml
 from dotenv import load_dotenv
 
-ROOT = Path(__file__).resolve().parent.parent
+# APP_DIR: where the code and bundled defaults live (config.yaml, profile template).
+# ROOT (home): where YOUR data lives. Same folder normally; the desktop app sets
+# CREATOROS_HOME to your user app-data folder so the data survives app updates.
+APP_DIR = Path(__file__).resolve().parent.parent
+ROOT = Path(os.environ.get("CREATOROS_HOME") or APP_DIR)
 WORKSPACE = ROOT / "workspace"
 BLOG_OUTPUT = WORKSPACE / "output" / "blog"
 PROFILE_DIR = ROOT / "profile"
 DATA_DIR = ROOT / "data"
+LOG_DIR = ROOT / "logs"
 
 log = logging.getLogger("creatoros")
 
 
 def setup_logging() -> None:
-    (ROOT / "logs").mkdir(exist_ok=True)
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler(ROOT / "logs" / "creatoros.log", encoding="utf-8"),
+            logging.FileHandler(LOG_DIR / "creatoros.log", encoding="utf-8"),
         ],
     )
     for noisy in ("apscheduler", "httpx", "httpx2", "anthropic"):
@@ -55,7 +60,7 @@ def load_config(path: str | None = None) -> dict:
     """config.yaml holds the documented defaults; config.local.yaml (written by the
     dashboard, ignored by git) holds your personal changes on top."""
     load_dotenv(ROOT / ".env")
-    base = _read_yaml(Path(path) if path else ROOT / "config.yaml")
+    base = _read_yaml(Path(path) if path else APP_DIR / "config.yaml")
     return deep_merge(base, _read_yaml(LOCAL_CONFIG))
 
 
