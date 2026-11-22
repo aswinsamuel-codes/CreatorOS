@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [0.2.0] - 2026-11-22
 
 ### Added
 - **Documents** in My profile: upload a resume, portfolio or project write-ups (PDF, Word,
