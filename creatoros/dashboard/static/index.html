@@ -35,13 +35,29 @@
   .card > h2:first-child, .card > h3:first-child { margin-top:0; }
   .card h2 { font-size:22px; } .card h3 { font-size:18px; }
   .tag-title { display:inline-block; padding:2px 10px; border:var(--b); margin:0 0 14px; font-family:"Archivo Black", sans-serif; }
-  .bg-yellow{background:var(--yellow)} .bg-pink{background:var(--pink)} .bg-blue{background:var(--blue)} .bg-lime{background:var(--lime)} .bg-orange{background:var(--orange)} .bg-purple{background:var(--purple)}
+  .bg-white{background:var(--white)} .bg-yellow{background:var(--yellow)} .bg-pink{background:var(--pink)} .bg-blue{background:var(--blue)} .bg-lime{background:var(--lime)} .bg-orange{background:var(--orange)} .bg-purple{background:var(--purple)}
   .list { padding:0; max-height:76vh; overflow:auto; }
   .item { padding:14px 16px; border-bottom:var(--b); cursor:pointer; }
   .item:last-child { border-bottom:0; }
   .item:hover { background:#fff1c1; } .item.sel { background:var(--yellow); }
   .item .t { font-weight:700; } .item .m { font-size:13px; margin-top:4px; }
   .badge { display:inline-block; font-size:12px; font-weight:700; padding:1px 8px; border:2px solid var(--ink); text-transform:uppercase; }
+  .tiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:22px; }
+  .tile { background:var(--white); border:var(--b); box-shadow:var(--shadow); padding:18px 14px; text-align:center; cursor:pointer; transition:transform .08s, box-shadow .08s; }
+  .tile:hover { transform:translate(-2px,-2px); box-shadow:8px 8px 0 var(--ink); }
+  .tile .logo-c { width:64px; height:64px; margin:0 auto 10px; border:var(--b); border-radius:50%; display:flex; align-items:center; justify-content:center;
+                  font:400 22px "Archivo Black", sans-serif; color:#fff; box-shadow:var(--shadow-sm); }
+  .tile .name { font-weight:700; font-size:17px; } .tile .grp { font-size:12px; color:#555; margin:2px 0 8px; }
+  .tile.add { background:var(--yellow); border-style:dashed; } .tile.add .logo-c { background:var(--white); color:var(--ink); font-size:34px; }
+  .modal-bg { position:fixed; inset:0; background:rgba(17,17,17,.55); display:none; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; z-index:8; }
+  .modal-bg.open { display:flex; }
+  .modal { background:var(--paper); border:var(--b); box-shadow:10px 10px 0 var(--ink); width:min(680px, 100%); padding:24px; position:relative; }
+  .modal .x { position:absolute; top:12px; right:12px; }
+  .steps { counter-reset:s; list-style:none; padding:0; margin:12px 0; }
+  .steps li { counter-increment:s; position:relative; padding:8px 8px 8px 46px; margin:8px 0; background:var(--white); border:2px solid var(--ink); }
+  .steps li::before { content:counter(s); position:absolute; left:8px; top:7px; width:28px; height:28px; border:2px solid var(--ink); background:var(--yellow);
+                      font:400 14px "Archivo Black", sans-serif; display:flex; align-items:center; justify-content:center; }
+  .steps a { color:var(--ink); background:var(--blue); font-weight:700; text-decoration:none; padding:0 4px; border:1px solid var(--ink); margin-left:4px; white-space:nowrap; }
   .s-scheduled { background:var(--purple); }
   .thumbs { display:flex; gap:10px; flex-wrap:wrap; margin:12px 0; }
   .thumbs img { width:140px; height:100px; object-fit:cover; border:var(--b); box-shadow:var(--shadow-sm); background:#fff; }
@@ -92,6 +108,7 @@
     <button data-tab="posts" class="active">📝 Posts</button>
     <button data-tab="write">⚡ Write now</button>
     <button data-tab="folder">📁 Folder → post</button>
+    <button data-tab="video">🎬 Video → post</button>
     <button data-tab="connections">🔌 Connections</button>
     <button data-tab="profile">🙋 My profile</button>
     <button data-tab="settings">⚙️ Settings</button>
@@ -151,12 +168,51 @@
     </div>
   </section>
 
+  <!-- VIDEO -> POST -->
+  <section id="video" class="tab">
+    <div class="grid2">
+      <div class="card">
+        <div class="tag-title bg-pink">🎬 Video → post</div>
+        <p class="hint">Give a video file or a folder of videos (MP4, MOV, WEBM, MKV). The agent watches sample frames
+          (and the transcript if available), then writes the YouTube title, description, tags, chapters and a LinkedIn caption.
+          Vertical videos up to 3 minutes go out as YouTube Shorts.</p>
+        <label>Video file or folder</label>
+        <div class="row" style="margin-top:0"><input class="grow" id="vPath" placeholder="D:\Videos\demo.mp4  or  D:\Videos\to-post">
+          <button class="btn white" onclick="scanVideo()">🔍 Check</button></div>
+        <div id="vFiles"></div>
+        <label>What should the agent do?</label>
+        <textarea id="vInstr" style="min-height:110px;font-family:inherit;font-size:15px" placeholder="e.g. This is a tutorial on deploying FastAPI to AWS. Target beginner developers. Mention the GitHub repo github.com/me/demo."></textarea>
+        <div class="row" id="vExamples"></div>
+      </div>
+      <div class="card">
+        <div class="tag-title bg-blue">⚙️ How to post</div>
+        <label>Post to</label>
+        <div class="row"><label class="switch"><input type="checkbox" class="v-t" value="youtube" checked> YouTube</label>
+          <label class="switch"><input type="checkbox" class="v-t" value="linkedin"> LinkedIn</label></div>
+        <div class="row">
+          <div class="grow"><label>YouTube visibility</label><select id="vPrivacy"><option value="private">private</option><option value="unlisted">unlisted</option><option value="public">public</option></select></div>
+          <div class="grow"><label>YouTube category</label><select id="vCat">
+            <option value="28">Science &amp; Technology</option><option value="27">Education</option><option value="22">People &amp; Blogs</option>
+            <option value="24">Entertainment</option><option value="20">Gaming</option><option value="26">Howto &amp; Style</option><option value="25">News &amp; Politics</option></select></div>
+        </div>
+        <p class="hint">Note: until your Google project passes YouTube's API audit, YouTube keeps API uploads private. You can switch them to public in YouTube Studio.</p>
+        <div class="row"><div class="grow"><label>Hours between videos (folder)</label><input id="vInterval" type="number" min="1" value="24"></div>
+          <div class="grow"><label>Start at (empty = now)</label><input id="vStart" type="datetime-local"></div></div>
+        <label class="switch"><input type="checkbox" id="vTranscribe" checked> Use speech transcript for better descriptions and chapters (needs <code>pip install faster-whisper</code>, free and runs locally)</label>
+        <label>Agent role for this job</label><select id="vRole"></select>
+        <label>Extra instructions for the role (optional)</label><input id="vCustom" placeholder="e.g. focus on search keywords developers use">
+        <div class="row"><button class="btn green" onclick="runVideo()">🚀 Inspect & write metadata</button></div>
+      </div>
+    </div>
+  </section>
+
   <!-- CONNECTIONS -->
   <section id="connections" class="tab">
     <div class="card"><div class="tag-title bg-yellow">🔌 Connections</div>
-      <p class="hint">Connect your platforms. LinkedIn uses its official login (you sign in on LinkedIn's own page), so CreatorOS never sees your password.
-        Keys saved here are stored only on this computer (data/connections.json). Values in .env take priority.</p></div>
-    <div class="grid2" id="connGrid"></div>
+      <p class="hint">Click a platform to connect it - each one has simple step-by-step instructions. No coding or files needed.
+        LinkedIn and YouTube use their official login pages, so CreatorOS never sees your passwords. Everything is stored only on this computer.</p></div>
+    <div class="tiles" id="connGrid"></div>
+    <div class="modal-bg" id="modalBg" onclick="if (event.target === this) closeModal()"><div class="modal" id="modal"></div></div>
   </section>
 
   <!-- PROFILE -->
@@ -294,7 +350,7 @@ async function safe(fn) { try { await fn(); } catch (e) { toast(e.message, true)
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   document.querySelectorAll("nav button, .tab").forEach(x => x.classList.remove("active"));
   b.classList.add("active"); $(b.dataset.tab).classList.add("active");
-  ({ profile: loadProfile, status: loadStatus, settings: loadSettings, folder: loadFolder, connections: loadConnections })[b.dataset.tab]?.();
+  ({ profile: loadProfile, status: loadStatus, settings: loadSettings, folder: loadFolder, video: loadVideo, connections: loadConnections })[b.dataset.tab]?.();
 });
 function openTab(name) { document.querySelector(`nav button[data-tab=${name}]`).click(); }
 
@@ -313,7 +369,7 @@ const EXAMPLES = [
 async function loadFolder() {
   const [ps, st] = [await loadPersonas(), await api("/api/settings")];
   $("fRole").innerHTML = `<option value="">Use my default role</option>` + ps.filter(p => p.id !== "custom").map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join("");
-  $("fTargets").innerHTML = st.publishers.filter(t => t !== "medium" && t !== "devto").map(t => `<label class="switch"><input type="checkbox" class="f-t" value="${t}" ${t === "linkedin" ? "checked" : ""}> ${t}</label>`).join("");
+  $("fTargets").innerHTML = st.publishers.filter(t => !["medium", "devto", "youtube"].includes(t)).map(t => `<label class="switch"><input type="checkbox" class="f-t" value="${esc(t)}" ${t === "linkedin" ? "checked" : ""}> ${esc(st.publisher_names[t] || t)}</label>`).join("");
   $("fExamples").innerHTML = EXAMPLES.map((e, i) => `<button class="chip" onclick="$('fInstr').value = EXAMPLES[${i}][1]">${e[0]}</button>`).join("");
 }
 const scanFolder = () => safe(async () => {
@@ -334,40 +390,136 @@ const runFolder = () => safe(async () => {
   toast(r.message); setTimeout(() => { openTab("posts"); }, 4000);
 });
 
+/* ---------------- video -> post ---------------- */
+const VEXAMPLES = [
+  ["👩‍💻 Dev tutorial", "This is a coding tutorial. Target developers searching for how to do this. List what they'll learn and the tools used."],
+  ["🚀 Product demo", "This is a demo of my project. Explain the problem it solves, key features shown, and invite people to try it."],
+  ["⚡ Short clip", "Short, punchy clip. Hook in the first line, curiosity-driven title, strong call to follow."],
+  ["🎙️ Talk / vlog", "This is a talk/vlog. Summarise the key points and takeaways for busy viewers."],
+];
+async function loadVideo() {
+  const [ps, st] = [await loadPersonas(), await api("/api/settings")];
+  $("vRole").innerHTML = `<option value="">Use my default role</option>` + ps.filter(p => p.id !== "custom").map(p => `<option value="${p.id}">${esc(p.label)}</option>`).join("");
+  document.querySelectorAll(".v-t-custom").forEach(e => e.remove());
+  const vt = document.querySelector(".v-t").closest(".row");
+  st.publishers.filter(t => t.startsWith("custom:")).forEach(t => vt.insertAdjacentHTML("beforeend",
+    `<label class="switch v-t-custom"><input type="checkbox" class="v-t" value="${esc(t)}"> ${esc(st.publisher_names[t] || t)}</label>`));
+  const yt = st.settings.publish?.youtube || {};
+  $("vPrivacy").value = yt.privacy || "private"; $("vCat").value = yt.category_id || "28";
+  $("vExamples").innerHTML = VEXAMPLES.map((e, i) => `<button class="chip" onclick="$('vInstr').value = VEXAMPLES[${i}][1]">${e[0]}</button>`).join("");
+}
+const scanVideo = () => safe(async () => {
+  const r = await api("/api/video/scan", "POST", { path: $("vPath").value.trim() });
+  $("vFiles").innerHTML = `<table><tr><th>Video</th><th>Length</th><th>Format</th></tr>${r.videos.map(v => `<tr><td>${esc(v.name)}</td>
+    <td>${Math.floor(v.duration / 60)}:${String(Math.round(v.duration % 60)).padStart(2, "0")}</td>
+    <td>${v.vertical ? (v.duration <= 180 ? "📱 vertical → Short" : "📱 vertical") : "🖥️ horizontal"} · ${v.width}×${v.height}</td></tr>`).join("")}</table>`;
+});
+const runVideo = () => safe(async () => {
+  const body = {
+    path: $("vPath").value.trim(), instructions: $("vInstr").value.trim(),
+    targets: [...document.querySelectorAll(".v-t:checked")].map(i => i.value),
+    privacy: $("vPrivacy").value, category_id: $("vCat").value,
+    interval_hours: +$("vInterval").value || 24, start_at: $("vStart").value || null,
+    transcribe: $("vTranscribe").checked, role: $("vRole").value || null, custom_role: $("vCustom").value.trim() || null,
+  };
+  if (!body.path) return toast("Enter a video file or folder", true);
+  if (!body.targets.length) return toast("Choose where to post", true);
+  const r = await api("/api/video/run", "POST", body);
+  toast(r.message); setTimeout(() => openTab("posts"), 4000);
+});
+
 /* ---------------- connections ---------------- */
+let CONN = { platforms: [], custom: [] };
 async function loadConnections() {
-  const list = await api("/api/connections");
-  $("connGrid").innerHTML = list.map(c => {
-    const fields = c.fields.map(f => `<label>${esc(f.name)} ${f.set ? `<span class="badge s-published">set${f.source === "env" ? " in .env" : ""}</span>` : ""}</label>
-      <input type="password" class="c-f" data-p="${c.id}" data-name="${esc(f.name)}" placeholder="${f.set ? esc(f.masked) + " (leave empty to keep)" : "paste here"}" ${f.source === "env" && f.set ? "disabled" : ""}>`).join("");
-    let extra = "";
-    if (c.id === "linkedin") {
-      const o = c.oauth || {};
-      extra = `<label>Redirect URL to add in your LinkedIn app</label>
-        <div class="row" style="margin-top:0"><input class="grow" value="${esc(c.redirect_uri)}" readonly onclick="this.select()"></div>
-        <div class="row">${o.connected
-          ? `<span class="badge s-published">✔ connected as ${esc(o.name)} · ${o.days_left} days left</span>
-             <button class="btn white sm" onclick="location.href='/api/connections/linkedin/start'">Reconnect</button>
-             <button class="btn red sm" onclick="disconnectLinkedIn()">Disconnect</button>`
-          : `<button class="btn pink" onclick="connectLinkedIn()" ${c.ready ? "" : "disabled title='Save Client ID and Secret first'"}>🔗 Connect with LinkedIn</button>`}</div>`;
-    }
-    const status = c.id === "linkedin" ? (c.oauth?.connected ? "connected" : "not connected") : (c.ready ? "ready" : "not set");
-    return `<div class="card"><div class="row" style="justify-content:space-between;margin-top:0"><h3 style="margin:0">${esc(c.label)}</h3>
-      <span class="badge ${status === "ready" || status === "connected" ? "s-published" : "s-pending"}">${status}</span></div>
-      <p class="hint">${esc(c.help)}</p>${fields}
-      <div class="row"><button class="btn green sm" onclick="saveConn('${c.id}')">Save</button></div>${extra}</div>`;
-  }).join("");
+  CONN = await api("/api/connections");
+  const tile = (onclick, color, logo, name, grp, ok, label) => `<div class="tile" onclick="${onclick}">
+      <div class="logo-c" style="background:${color}">${esc(logo)}</div><div class="name">${esc(name)}</div><div class="grp">${esc(grp)}</div>
+      <span class="badge ${ok ? "s-published" : "s-pending"}">${esc(label)}</span></div>`;
+  $("connGrid").innerHTML =
+    CONN.platforms.map(c => tile(`openPlatform('${c.id}')`, c.color, c.logo, c.label, c.group, c.connected, c.connected ? "✔ connected" : "connect")).join("") +
+    CONN.custom.map(c => tile(`openCustom('${c.id}')`, c.color, c.name.slice(0, 2).toUpperCase(), c.name, "Custom · webhook/API", true, "✔ added")).join("") +
+    `<div class="tile add" onclick="openCustom()"><div class="logo-c">＋</div><div class="name">Add a platform</div><div class="grp">Any app with an API or webhook</div><span class="badge bg-white">add</span></div>`;
+}
+function openModal(html) { $("modal").innerHTML = `<button class="btn white sm x" onclick="closeModal()">✕</button>` + html; $("modalBg").classList.add("open"); }
+function closeModal() { $("modalBg").classList.remove("open"); loadConnections(); }
+function stepsHtml(steps) {
+  return `<ol class="steps">${steps.map(([text, link]) => `<li>${esc(text)}${link ? ` <a href="${esc(link)}" target="_blank" rel="noopener">open ↗</a>` : ""}</li>`).join("")}</ol>`;
+}
+function openPlatform(id) {
+  const c = CONN.platforms.find(p => p.id === id);
+  const fields = c.fields.map(f => `<label>${esc(f.label)} ${f.set ? `<span class="badge s-published">saved${f.source === "env" ? " (from .env)" : ""}</span>` : ""}</label>
+    <div class="row" style="margin-top:0"><input class="grow c-f" type="${f.secret ? "password" : "text"}" data-name="${esc(f.name)}"
+      placeholder="${f.set && f.secret ? esc(f.masked) + " - leave empty to keep" : esc(f.placeholder || "paste here")}" value="${f.secret ? "" : esc(f.masked)}" ${f.source === "env" && f.set ? "disabled" : ""}>
+      ${f.name === "TELEGRAM_CHAT_ID" ? `<button class="btn yellow sm" onclick="detectChat()">🔎 Find my chat ID</button>` : ""}</div>`).join("");
+  let oauth = "";
+  if (c.oauth) {
+    const o = c.oauth;
+    oauth = `<label>Redirect URL (copy this into step ${c.steps.findIndex(s => /redirect/i.test(s[0])) + 1})</label>
+      <div class="row" style="margin-top:0"><input class="grow" id="redir" value="${esc(c.redirect_uri)}" readonly>
+        <button class="btn white sm" onclick="navigator.clipboard.writeText($('redir').value); toast('Copied')">📋 Copy</button></div>
+      <div class="row">${o.connected
+        ? `<span class="badge s-published">✔ connected as ${esc(o.name)}${o.days_left !== undefined ? ` · ${o.days_left} days left` : ""}</span>
+           <button class="btn white sm" onclick="connectOAuth('${c.id}')">Reconnect</button>
+           <button class="btn red sm" onclick="disconnectOAuth('${c.id}')">Disconnect</button>`
+        : `<button class="btn pink" onclick="connectOAuth('${c.id}')" ${c.ready ? "" : "disabled title='Save the Client ID and secret first'"}>🔗 Connect ${esc(c.label)}</button>`}</div>`;
+  }
+  openModal(`<div class="row" style="margin-top:0"><div class="logo-c" style="width:52px;height:52px;border:var(--b);border-radius:50%;display:flex;align-items:center;justify-content:center;background:${c.color};color:#fff;font-family:'Archivo Black'">${esc(c.logo)}</div>
+      <h2 style="margin:0">Connect ${esc(c.label)}</h2></div>
+    ${stepsHtml(c.steps)}${fields}
+    <div class="row"><button class="btn green" onclick="saveConn('${c.id}')">💾 Save</button>
+      ${c.oauth ? "" : `<button class="btn white" onclick="testConn('${c.id}')">🧪 Test</button>`}</div>${oauth}
+    <p class="hint" id="connMsg"></p>`);
 }
 const saveConn = id => safe(async () => {
-  const values = {}; document.querySelectorAll(`.c-f[data-p=${id}]`).forEach(i => { if (i.value.trim()) values[i.dataset.name] = i.value.trim(); });
-  if (!Object.keys(values).length) return toast("Nothing to save", true);
-  await api(`/api/connections/${id}`, "PUT", { values }); toast("Saved"); loadConnections();
+  const values = {}; document.querySelectorAll("#modal .c-f").forEach(i => { if (i.value.trim() && !i.disabled) values[i.dataset.name] = i.value.trim(); });
+  if (!Object.keys(values).length) return toast("Paste something first", true);
+  await api(`/api/connections/${id}`, "PUT", { values }); toast("Saved ✔");
+  CONN = await api("/api/connections"); openPlatform(id);
 });
-function connectLinkedIn() {
-  if (location.hostname !== "localhost") toast("Tip: open the dashboard as http://localhost:8787 so the redirect URL matches your LinkedIn app", true);
-  location.href = "/api/connections/linkedin/start";
+const testConn = id => safe(async () => { $("connMsg").textContent = "Testing…"; try { const r = await api(`/api/connections/${id}/test`, "POST"); $("connMsg").textContent = r.message; toast(r.message); } catch (e) { $("connMsg").textContent = "❌ " + e.message; throw e; } });
+const detectChat = () => safe(async () => {
+  const r = await api("/api/connections/telegram/detect", "POST");
+  const chat = r.chats[0]; document.querySelector('#modal .c-f[data-name="TELEGRAM_CHAT_ID"]').value = chat.id;
+  toast(`Found ${chat.name || "your chat"} - click Save`);
+});
+function openCustom(id) {
+  const c = id ? CONN.custom.find(x => x.id === id) : { name: "", url: "", method: "POST", auth_header: "Authorization", send_media: true, color: "#b49bff" };
+  openModal(`<h2 style="margin-top:0">${id ? "Edit " + esc(c.name) : "➕ Add a platform"}</h2>
+    <p class="hint">Connect any app that accepts a webhook or API call. Easiest way: create a free automation in <b>Zapier</b>, <b>Make</b> or <b>n8n</b>
+      that starts with "Webhook" and ends with posting to Instagram, Facebook, X, Threads, Discord, WordPress… then paste its webhook URL here.</p>
+    ${stepsHtml([["In Zapier/Make/n8n, create a new automation with a 'Catch webhook' trigger and copy the webhook URL", "https://zapier.com/apps/webhook/integrations"],
+                 ["Paste the URL below, give the platform a name and click Save"],
+                 ["Click 'Send test' - then map the fields (text, title, media) to the post action in your automation"],
+                 ["Tick this platform under 'Post to' in Folder → post, Video → post or Settings"]])}
+    <label>Platform name</label><input id="cName" value="${esc(c.name)}" placeholder="e.g. Instagram (via Zapier)">
+    <label>Webhook / API URL</label><input id="cUrl" value="${esc(c.url)}" placeholder="https://hooks.zapier.com/…">
+    <div class="row"><div class="grow"><label>Method</label><select id="cMethod"><option>POST</option><option>PUT</option></select></div>
+      <div class="grow"><label>Auth header name (if the API needs a key)</label><input id="cHeader" value="${esc(c.auth_header)}"></div></div>
+    <label>API key / token (optional) ${c.has_key ? `<span class="badge s-published">saved</span>` : ""}</label>
+    <input id="cKey" type="password" placeholder="${c.has_key ? "leave empty to keep" : "e.g. Bearer abc123"}">
+    <label class="switch"><input type="checkbox" id="cMedia" ${c.send_media ? "checked" : ""}> Include images/video in the request (base64, up to 25 MB)</label>
+    <label>Tile colour</label><input id="cColor" type="color" value="${esc(c.color)}" style="width:80px;height:40px;padding:2px">
+    <div class="row"><button class="btn green" onclick="saveCustom('${id || ""}')">💾 Save</button>
+      ${id ? `<button class="btn white" onclick="testCustom('${id}')">🧪 Send test</button><button class="btn red" onclick="deleteCustom('${id}')">🗑️ Remove</button>` : ""}</div>
+    <p class="hint" id="connMsg"></p>
+    <details><summary class="hint">What CreatorOS sends (for developers)</summary><pre style="white-space:pre-wrap;font-size:12px">{"source": "CreatorOS", "kind": "blog|social|video", "title": "…", "text": "ready-to-post text",
+ "description": "…", "tags": […], "hashtags": ["#…"], "link": "…",
+ "media": [{"type": "image|video", "filename": "…", "mime": "…", "alt": "…", "data_base64": "…"}]}
+Reply with {"url": "…"} to show a link on the post.</pre></details>`);
+  $("cMethod").value = c.method || "POST";
 }
-const disconnectLinkedIn = () => safe(async () => { if (confirm("Disconnect LinkedIn?")) { await api("/api/connections/linkedin/disconnect", "POST"); loadConnections(); } });
+const saveCustom = id => safe(async () => {
+  const r = await api("/api/connections/custom", "POST", { id: id || null, name: $("cName").value, url: $("cUrl").value, method: $("cMethod").value,
+    auth_header: $("cHeader").value, api_key: $("cKey").value, send_media: $("cMedia").checked, color: $("cColor").value });
+  toast("Saved ✔ - now send a test"); CONN = await api("/api/connections"); openCustom(r.id);
+});
+const testCustom = id => safe(async () => { $("connMsg").textContent = "Sending…"; try { const r = await api(`/api/connections/custom/${id}/test`, "POST"); $("connMsg").textContent = "✔ " + r.message; toast(r.message); } catch (e) { $("connMsg").textContent = "❌ " + e.message; throw e; } });
+const deleteCustom = id => safe(async () => { if (confirm("Remove this platform?")) { await api(`/api/connections/custom/${id}`, "DELETE"); closeModal(); } });
+function connectOAuth(id) {
+  if (location.hostname !== "localhost") toast("Tip: open the dashboard as http://localhost:8787 so the redirect URL matches your app", true);
+  location.href = `/api/connections/${id}/start`;
+}
+const disconnectOAuth = id => safe(async () => { if (confirm(`Disconnect ${id}?`)) { await api(`/api/connections/${id}/disconnect`, "POST"); loadConnections(); } });
 
 /* ---------------- posts ---------------- */
 async function loadPosts() {
@@ -382,8 +534,8 @@ async function openPost(id) {
   current = id; loadPosts();
   const p = await api(`/api/posts/${id}`);
   const links = Object.entries(p.published || {}).map(([k, v]) => `<div><b>${esc(k)}:</b> <a href="${esc(v)}" target="_blank">${esc(v)}</a></div>`).join("");
-  const social = p.kind === "social";
-  const thumbs = (p.media || []).map(m => `<img src="/api/media?path=${encodeURIComponent(m.path)}" alt="${esc(m.alt)}" title="${esc(m.alt)}">`).join("");
+  const social = p.kind === "social", video = p.kind === "video", meta = p.meta || {};
+  const thumbs = (p.media || []).map(m => `<img src="/api/media?path=${encodeURIComponent(m.thumb || m.path)}" alt="${esc(m.alt)}" title="${esc(m.alt)}">`).join("");
   const when = p.scheduled_at ? `<span class="badge bg-purple">🗓️ ${esc(p.scheduled_at.replace("T", " "))}</span>` : "";
   const to = (p.targets || []).length ? `<span class="badge bg-blue">→ ${esc(p.targets.join(", "))}</span>` : "";
   $("postView").innerHTML = `
@@ -401,10 +553,19 @@ async function openPost(id) {
       <label>Title</label><input id="eTitle" value="${esc(p.title)}">
       <label>Subtitle</label><input id="eSub" value="${esc(p.subtitle)}">
       <label>Tags (comma separated)</label><input id="eTags" value="${esc((p.tags || []).join(", "))}">
-      <label>Body (Markdown)</label><textarea id="eBody" style="min-height:400px">${esc(p.body)}</textarea>
+      <label>${video ? "YouTube description" : social ? "Post text" : "Body (Markdown)"}</label><textarea id="eBody" style="min-height:${video ? 260 : 400}px">${esc(p.body)}</textarea>
+      ${video ? `<label>LinkedIn caption</label><textarea id="eLinkedIn" style="min-height:200px">${esc(meta.linkedin_text || "")}</textarea>` : ""}
       <div class="row"><button class="btn green" onclick="saveEdit()">Save</button></div>
     </div>
-    ${social
+    ${video
+      ? `<div class="preview"><p><span class="badge bg-pink">${(meta.youtube || {}).short ? "YouTube Short" : "Video"}</span>
+          <span class="badge bg-yellow">${Math.round(meta.duration || 0)} s</span>
+          <span class="badge bg-blue">${esc((meta.youtube || {}).privacy || "")}</span>
+          ${meta.transcript ? `<span class="badge bg-lime">transcript used</span>` : ""}</p>
+          <h2>${esc(p.title)}</h2><p>${(p.tags || []).map(t => `<span class="badge bg-yellow">${esc(t)}</span>`).join(" ")}</p>
+          <h3>YouTube description</h3><div style="white-space:pre-wrap">${esc(p.body)}</div>
+          ${meta.linkedin_text ? `<h3>LinkedIn caption</h3><div style="white-space:pre-wrap">${esc(meta.linkedin_text)}</div>` : ""}</div>`
+      : social
       ? `<div class="preview"><h2>${esc(p.title)}</h2><div style="white-space:pre-wrap">${esc(p.body)}</div></div>`
       : `<div class="preview"><h1>${esc(p.title)}</h1><p><i>${esc(p.subtitle)}</i></p>
       <p>${(p.tags || []).map(t => `<span class="badge bg-yellow">${esc(t)}</span>`).join(" ")}</p>${md(p.body)}</div>`}`;
@@ -422,7 +583,9 @@ const revise = () => safe(async () => {
   await api(`/api/posts/${current}/revise`, "POST", { instructions }); toast("Rewriting… refresh in a minute");
 });
 const saveEdit = () => safe(async () => {
-  await api(`/api/posts/${current}`, "PUT", { title: $("eTitle").value, subtitle: $("eSub").value, body: $("eBody").value, tags: csv($("eTags").value) });
+  const body = { title: $("eTitle").value, subtitle: $("eSub").value, body: $("eBody").value, tags: csv($("eTags").value) };
+  if ($("eLinkedIn")) body.meta = { linkedin_text: $("eLinkedIn").value };
+  await api(`/api/posts/${current}`, "PUT", body);
   toast("Saved"); openPost(current);
 });
 const generate = () => safe(async () => {
@@ -522,7 +685,7 @@ async function loadSettings() {
   $("providers").innerHTML = Object.entries(S.providers).map(([n, p]) => `<tr><td><b>${esc(n)}</b></td><td>${esc(p.type)}</td>
     <td>${p.type === "openai_compatible" ? `<input class="p-url" data-name="${esc(n)}" value="${esc(p.base_url)}">` : "official API"}</td></tr>`).join("");
   $("appr").checked = S.approval?.required !== false; $("autopub").value = S.approval?.auto_publish_after_minutes || 0;
-  $("targets").innerHTML = r.publishers.map(t => `<label class="switch"><input type="checkbox" class="t-pub" value="${t}" ${(pub.targets || []).includes(t) ? "checked" : ""}> ${t}</label>`).join("");
+  $("targets").innerHTML = r.publishers.filter(t => t !== "youtube").map(t => `<label class="switch"><input type="checkbox" class="t-pub" value="${esc(t)}" ${(pub.targets || []).includes(t) ? "checked" : ""}> ${esc(r.publisher_names[t] || t)}</label>`).join("");
   $("mstatus").value = pub.medium?.publish_status || "draft"; $("mnotify").checked = !!pub.medium?.notify_followers; $("devpub").checked = !!pub.devto?.published;
   $("hn").checked = !!src.hackernews?.enabled; $("hnlimit").value = src.hackernews?.limit || 40;
   $("rd").checked = !!src.reddit?.enabled; $("subs").value = (src.reddit?.subreddits || []).join(", ");

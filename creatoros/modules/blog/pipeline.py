@@ -123,7 +123,10 @@ def publish_post(cfg: dict, post_id: int) -> dict:
 
 def revise(cfg: dict, post_id: int, instructions: str) -> None:
     post = db.get_post(post_id)
-    if post.get("kind") == "social":
+    if post.get("kind") == "video":
+        from ..video import posting
+        new = posting.revise(get_llm(cfg, "writer"), post, instructions, author_context(cfg))
+    elif post.get("kind") == "social":
         from ..social import folder
         new = folder.revise(get_llm(cfg, "writer"), post, instructions, author_context(cfg))
     else:

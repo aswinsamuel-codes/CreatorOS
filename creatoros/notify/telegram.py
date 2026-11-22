@@ -58,7 +58,22 @@ class Telegram:
 
     def send_for_approval(self, post: dict) -> None:
         e = html.escape
-        if post.get("kind") == "social":
+        if post.get("kind") == "video":
+            meta = post.get("meta") or {}
+            thumbs = [{"path": m["thumb"]} for m in post.get("media") or [] if m.get("thumb")]
+            try:
+                self.send_photos(thumbs)
+            except Exception as ex:
+                log.warning("Could not send thumbnail: %s", ex)
+            when = (post.get("scheduled_at") or "").replace("T", " ")
+            kind = "Short" if (meta.get("youtube") or {}).get("short") else "video"
+            text = (
+                f"🎬 <b>New {kind} #{post['id']}</b> → {e(', '.join(post.get('targets') or []))}"
+                f" · {int(meta.get('duration', 0))}s · scheduled {e(when)}\n\n"
+                f"<b>{e(post['title'])}</b>\n\n<b>YouTube description:</b>\n{e(post['body'][:1500])}\n\n"
+                f"<b>LinkedIn caption:</b>\n{e((meta.get('linkedin_text') or '')[:1200])}"
+            )
+        elif post.get("kind") == "social":
             try:
                 self.send_photos(post.get("media") or [])
             except Exception as ex:

@@ -12,14 +12,17 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 
 from .. import __version__, connections, db, documents, notify, scheduler
 from ..modules.social import folder as folder_mod
+from ..modules.video import posting, videoinfo
 from ..personas import list_personas
-from ..publishers import linkedin
+from ..publishers import linkedin, youtube
+
+OAUTH = {"linkedin": linkedin, "youtube": youtube}
 from ..config import (EDITABLE_SECTIONS, ROOT, deep_merge, env, load_config, log, read_local_config_text,
                       reset_local_config, save_local_config, write_local_config_text)
 from ..modules.blog import pipeline
 from ..modules.blog.angles import all_angles
 from ..profile import NOTES_DIR, PROFILE_FILE, ensure_profile, list_notes
-from ..publishers import PUBLISHERS
+from ..publishers import PUBLISHERS, is_target
 from ..settings import validate
 
 STATIC = Path(__file__).parent / "static"
@@ -30,7 +33,7 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
     token = env("DASHBOARD_TOKEN")
 
     # Browser redirects (OAuth) can't send the x-token header; the callback is protected by `state`.
-    OPEN_PATHS = ("/api/connections/linkedin/start", "/api/connections/linkedin/callback")
+    OPEN_PATHS = tuple(f"/api/connections/{p}/{step}" for p in OAUTH for step in ("start", "callback"))
 
     @app.middleware("http")
     async def check_token(request: Request, call_next):
@@ -80,7 +83,9 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
     def get_settings():
         return {
             "settings": {k: cfg.get(k) for k in EDITABLE_SECTIONS},
-            "angles": all_angles(cfg), "publishers": list(PUBLISHERS),
+            "angles": all_angles(cfg),
+            "publishers": list(PUBLISHERS) + [f"custom:{cid}" for cid in connections.list_custom()],
+            "publisher_names": {f"custom:{cid}": s["name"] for cid, s in connections.list_custom().items()},
             "local_yaml": read_local_config_text(),
         }
 
@@ -129,6 +134,8 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
     def save(post_id: int, data: dict = Body(...)):
         _post(post_id)
         fields = {k: data[k] for k in ("title", "subtitle", "body", "tags") if k in data}
+        if isinstance(data.get("meta"), dict):
+            fields["meta"] = {**(_post(post_id).get("meta") or {}), **data["meta"]}
         db.update_post(post_id, **fields)
         pipeline.save_markdown(db.get_post(post_id))
         return {"ok": True}
@@ -150,49 +157,167 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
         for pid, p in connections.PLATFORMS.items():
             fields = []
             for f in p["fields"]:
-                in_env = bool(os.environ.get(f, "").strip())
-                value = env(f)
-                fields.append({"name": f, "set": bool(value), "source": "env" if in_env else "dashboard",
-                               "masked": connections.mask(value)})
-            item = {"id": pid, **p, "fields": fields, "ready": all(x["set"] for x in fields)}
-            if pid == "linkedin":
-                item["oauth"] = linkedin.status()
-                item["redirect_uri"] = linkedin.redirect_uri(str(request.base_url))
+                in_env = bool(os.environ.get(f["name"], "").strip())
+                value = env(f["name"])
+                secret = f.get("secret", True)
+                fields.append({**f, "secret": secret, "set": bool(value), "source": "env" if in_env else "dashboard",
+                               "masked": connections.mask(value) if secret else (value or "")})
+            ready = all(x["set"] for x in fields)
+            item = {"id": pid, **p, "fields": fields, "ready": ready, "connected": ready}
+            if pid in OAUTH:
+                item["oauth"] = OAUTH[pid].status()
+                item["connected"] = item["oauth"].get("connected", False)
+                item["redirect_uri"] = OAUTH[pid].redirect_uri(str(request.base_url))
             out.append(item)
-        return out
+        custom = [{"id": cid, **{k: v for k, v in spec.items() if k != "api_key"},
+                   "has_key": bool(spec.get("api_key")), "target": f"custom:{cid}"}
+                  for cid, spec in connections.list_custom().items()]
+        return {"platforms": out, "custom": custom}
+
+    # Custom platforms (registered before the generic /{platform} routes).
+    @app.post("/api/connections/custom")
+    def custom_save(data: dict = Body(...)):
+        try:
+            cid = connections.save_custom(data.get("id") or None, data)
+        except ValueError as e:
+            raise HTTPException(400, str(e))
+        return {"ok": True, "id": cid}
+
+    @app.delete("/api/connections/custom/{cid}")
+    def custom_delete(cid: str):
+        connections.delete_custom(cid)
+        return {"ok": True}
+
+    @app.post("/api/connections/custom/{cid}/test")
+    def custom_test(cid: str):
+        from ..publishers.webhook import test_custom
+        try:
+            return {"ok": True, "message": test_custom(cid)}
+        except Exception as e:
+            raise HTTPException(400, str(e))
 
     @app.put("/api/connections/{platform}")
     def connections_save(platform: str, data: dict = Body(...)):
         if platform not in connections.PLATFORMS:
             raise HTTPException(404, "unknown platform")
-        allowed = connections.PLATFORMS[platform]["fields"]
-        connections.set_many({k: v for k, v in (data.get("values") or {}).items() if k in allowed})
+        connections.set_many({k: v for k, v in (data.get("values") or {}).items() if k in connections.ALLOWED_FIELDS
+                              and k in {f["name"] for f in connections.PLATFORMS[platform]["fields"]}})
         notify.reset()
         return {"ok": True}
 
-    @app.get("/api/connections/linkedin/start")
-    def linkedin_start(request: Request):
+    @app.post("/api/connections/telegram/detect")
+    def telegram_detect():
+        from ..notify.telegram import find_chat_ids
+        token = env("TELEGRAM_BOT_TOKEN")
+        if not token:
+            raise HTTPException(400, "Save your bot token first")
         try:
-            return RedirectResponse(linkedin.auth_url(str(request.base_url)))
+            chats = find_chat_ids(token)
+        except Exception as e:
+            raise HTTPException(400, f"Telegram said: {e}")
+        if not chats:
+            raise HTTPException(400, "No messages yet. Open your bot in Telegram, send it 'hi', then try again.")
+        return {"chats": [{"id": cid, "name": name} for cid, name in chats]}
+
+    @app.post("/api/connections/{platform}/test")
+    def connections_test(platform: str):
+        try:
+            return {"ok": True, "message": _test_platform(platform)}
+        except Exception as e:
+            raise HTTPException(400, str(e))
+
+    def _test_platform(platform: str) -> str:
+        import requests as rq
+        if platform == "claude":
+            import anthropic
+            key = env("ANTHROPIC_API_KEY")
+            if not key:
+                raise RuntimeError("Save your API key first")
+            try:
+                anthropic.Anthropic(api_key=key).models.retrieve(cfg["models"]["writer"]["model"])
+            except anthropic.AuthenticationError:
+                raise RuntimeError("Claude rejected this key - check it was copied completely")
+            return "Claude key works ✔"
+        if platform == "telegram":
+            from ..notify.telegram import Telegram
+            if not env("TELEGRAM_BOT_TOKEN"):
+                raise RuntimeError("Save your bot token first")
+            bot = Telegram(env("TELEGRAM_BOT_TOKEN"), env("TELEGRAM_CHAT_ID") or "")
+            me = bot.api("getMe")
+            if env("TELEGRAM_CHAT_ID"):
+                bot.send_text("✅ CreatorOS is connected to this chat.")
+                return f"@{me['username']} works - check Telegram for a test message ✔"
+            return f"@{me['username']} works - now click 'Find my chat ID'"
+        if platform == "medium":
+            from ..publishers import medium
+            return f"Connected to Medium as @{medium.me().get('username')} ✔"
+        if platform == "devto":
+            r = rq.get("https://dev.to/api/users/me", headers={"api-key": env("DEVTO_API_KEY") or ""}, timeout=20)
+            if r.status_code != 200:
+                raise RuntimeError("dev.to rejected this key")
+            return f"Connected to dev.to as @{r.json().get('username')} ✔"
+        if platform in OAUTH:
+            s = OAUTH[platform].status()
+            if not s.get("connected"):
+                raise RuntimeError("Not connected yet - click Connect")
+            return f"Connected as {s.get('name')} ✔"
+        raise RuntimeError("unknown platform")
+
+    def _oauth(platform: str):
+        if platform not in OAUTH:
+            raise HTTPException(404, "unknown platform")
+        return OAUTH[platform]
+
+    @app.get("/api/connections/{platform}/start")
+    def oauth_start(platform: str, request: Request):
+        try:
+            return RedirectResponse(_oauth(platform).auth_url(str(request.base_url)))
         except RuntimeError as e:
             return RedirectResponse(f"/?error={quote(str(e))}")
 
-    @app.get("/api/connections/linkedin/callback")
-    def linkedin_callback(request: Request, code: str = "", state: str = "", error: str = "",
-                          error_description: str = ""):
+    @app.get("/api/connections/{platform}/callback")
+    def oauth_callback(platform: str, request: Request, code: str = "", state: str = "", error: str = "",
+                       error_description: str = ""):
         if error:
             return RedirectResponse(f"/?error={quote(error_description or error)}")
         try:
-            info = linkedin.finish_auth(code, state, str(request.base_url))
+            info = _oauth(platform).finish_auth(code, state, str(request.base_url))
         except Exception as e:
-            log.error("LinkedIn connect failed: %s", e)
+            log.error("%s connect failed: %s", platform, e)
             return RedirectResponse(f"/?error={quote(str(e))}")
-        return RedirectResponse(f"/?connected={quote(info.get('name') or 'LinkedIn')}")
+        return RedirectResponse(f"/?connected={quote(info.get('name') or info.get('channel') or platform)}")
 
-    @app.post("/api/connections/linkedin/disconnect")
-    def linkedin_disconnect():
-        linkedin.disconnect()
+    @app.post("/api/connections/{platform}/disconnect")
+    def oauth_disconnect(platform: str):
+        _oauth(platform).disconnect()
         return {"ok": True}
+
+    # --------------------------------------------------------------- video
+    @app.post("/api/video/scan")
+    def video_scan(data: dict = Body(...)):
+        try:
+            files = videoinfo.scan(data.get("path", ""))
+            infos = [{"name": f.name, **videoinfo.probe(f)} for f in files[:50]]
+        except (FileNotFoundError, RuntimeError) as e:
+            raise HTTPException(400, str(e))
+        return {"count": len(files), "videos": infos}
+
+    @app.post("/api/video/run")
+    def video_run(data: dict = Body(...)):
+        try:
+            videoinfo.scan(data.get("path", ""))
+            videoinfo.require_ffmpeg()
+        except (FileNotFoundError, RuntimeError) as e:
+            raise HTTPException(400, str(e))
+        targets = [t for t in data.get("targets", []) if t in ("youtube", "linkedin") or
+                   (t.startswith("custom:") and is_target(t))] or ["youtube"]
+        yt_defaults = cfg.get("publish", {}).get("youtube", {})
+        _bg(posting.create_posts, cfg, data["path"], data.get("instructions", ""), targets,
+            data.get("privacy") or yt_defaults.get("privacy", "private"),
+            str(data.get("category_id") or yt_defaults.get("category_id", "28")),
+            float(data.get("interval_hours") or 24), data.get("start_at") or None,
+            bool(data.get("transcribe", True)), True, data.get("role") or None, data.get("custom_role"))
+        return {"ok": True, "message": "Inspecting your video(s) and writing titles and descriptions (about 30-90 s each)"}
 
     # ------------------------------------------------------ personas/folder
     @app.get("/api/personas")
@@ -213,7 +338,7 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
             folder_mod.scan(data.get("folder", ""))
         except FileNotFoundError as e:
             raise HTTPException(400, str(e))
-        targets = [t for t in data.get("targets", []) if t in PUBLISHERS] or ["linkedin"]
+        targets = [t for t in data.get("targets", []) if is_target(t)] or ["linkedin"]
         _bg(folder_mod.create_posts, cfg, data["folder"], data.get("instructions", ""), targets,
             data.get("mode", "combined"), float(data.get("interval_hours") or 24), data.get("start_at") or None,
             True, data.get("role") or None, data.get("custom_role"))

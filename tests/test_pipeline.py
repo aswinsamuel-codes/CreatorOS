@@ -22,6 +22,13 @@ POST_REPLY = (
 
 class FakeLLM:
     def complete(self, system, prompt, max_tokens=0, images=None):
+        if images and "VIDEO FACTS" in prompt:
+            assert len(images) == 6
+            return ('{"title": "Deploy FastAPI to AWS <fast>", "description": "Learn to deploy.", '
+                    '"tags": ["fastapi", "aws deploy", "python"], '
+                    '"chapters": [{"time": "0:00", "title": "Intro"}, {"time": "0:04", "title": "Too close"}, '
+                    '{"time": "0:10", "title": "Setup"}, {"time": "0:20", "title": "Deploy"}], '
+                    '"hashtags": ["#FastAPI", "AWS"], "linkedin_text": "I deployed FastAPI to AWS.", "thumbnail_frame": 2}')
         if images:  # folder inspection
             return ('{"type": "certificate", "title": "Cloud Practitioner", "issuer": "AWS", "date": "2026", '
                     '"skills": ["Cloud"], "summary": "AWS certificate", "alt_text": "AWS Cloud Practitioner certificate"}')
@@ -225,6 +232,172 @@ def test_linkedin_format_and_payload():
     assert calls["post"]["author"] == "urn:li:person:abc"
     assert [i["id"] for i in calls["post"]["content"]["multiImage"]["images"]] == ["urn:li:image:1", "urn:li:image:2"]
     assert calls["headers"]["LinkedIn-Version"] and calls["headers"]["X-Restli-Protocol-Version"] == "2.0.0"
+
+
+def _make_videos() -> Path:
+    import subprocess
+
+    folder = Path(tempfile.mkdtemp())
+    for name, size, secs in (("tutorial.mp4", "640x360", 30), ("clip.mp4", "360x640", 6)):
+        subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i", f"testsrc=size={size}:rate=15",
+                        "-f", "lavfi", "-i", "sine=frequency=440", "-t", str(secs), "-pix_fmt", "yuv420p",
+                        "-shortest", str(folder / name)], check=True, capture_output=True)
+    return folder
+
+
+def test_video_posts():
+    from creatoros.modules.video import posting, videoinfo
+    from creatoros import publishers
+
+    cfg = setup()
+    cfg["approval"]["required"] = True
+    posting.MEDIA_DIR = Path(tempfile.mkdtemp())
+    posting.get_llm = lambda cfg, role: FakeLLM()
+    posting.notify.send_for_approval = lambda post: None
+    sent = []
+    publishers.PUBLISHERS["youtube"] = lambda post, opts: sent.append(("yt", post["id"])) or "https://youtu.be/x"
+    publishers.PUBLISHERS["linkedin"] = lambda post, opts: sent.append(("li", post["id"])) or "https://linkedin/x"
+
+    folder = _make_videos()
+    (folder / "readme.txt").write_text("not a video")
+    files = videoinfo.scan(folder)
+    assert [f.name for f in files] == ["clip.mp4", "tutorial.mp4"]
+    info = videoinfo.probe(folder / "clip.mp4")
+    assert info["vertical"] and 5 <= info["duration"] <= 7 and info["has_audio"]
+
+    ids = posting.create_posts(cfg, str(folder), "tutorial", ["youtube", "linkedin"], privacy="unlisted",
+                               interval_hours=12, transcribe=False)
+    clip, tut = db.get_post(ids[0]), db.get_post(ids[1])
+    assert clip["kind"] == "video" and clip["status"] == "pending"
+    assert clip["title"].endswith("#Shorts") and "<" not in clip["title"]
+    assert clip["meta"]["youtube"] == {"privacy": "unlisted", "category_id": "28", "short": True}
+    assert not tut["meta"]["youtube"]["short"] and "#Shorts" not in tut["title"]
+    assert tut["meta"]["chapters"] == [{"time": "0:00", "title": "Intro"}, {"time": "0:10", "title": "Setup"},
+                                      {"time": "0:20", "title": "Deploy"}], tut["meta"]["chapters"]
+    assert "0:10 Setup" in tut["body"] and "#FastAPI #AWS" in tut["body"]
+    assert tut["meta"]["linkedin_text"].endswith("#FastAPI #AWS")
+    assert Path(tut["media"][0]["thumb"]).name == "frame_02.jpg" and Path(tut["media"][0]["thumb"]).exists()
+    assert tut["scheduled_at"] > clip["scheduled_at"]
+
+    assert pipeline.approve(cfg, ids[0]) == "published"
+    assert sent == [("yt", ids[0]), ("li", ids[0])]
+    assert pipeline.approve(cfg, ids[1]) == "scheduled"
+
+
+class _resp:
+    def __init__(self, status=200, data=None, headers=None):
+        self.status_code, self.headers, self.text, self._data = status, headers or {}, "", data or {}
+        self.ok = status < 400
+
+    def json(self):
+        return self._data
+
+
+def test_youtube_upload():
+    from creatoros.publishers import youtube
+
+    video = Path(tempfile.mkdtemp()) / "v.mp4"
+    video.write_bytes(b"x" * 2500)
+    thumb = video.with_suffix(".jpg")
+    thumb.write_bytes(b"jpg")
+    youtube.CHUNK = 1000
+    youtube._token = lambda: "tok"
+    calls = {"puts": []}
+
+    def fake_post(url, **kw):
+        if "thumbnails" in url:
+            calls["thumb"] = True
+            return _resp(200)
+        calls["init"] = kw["json"]
+        return _resp(200, headers={"Location": "https://upload/session"})
+
+    def fake_put(url, data=None, headers=None, **kw):
+        calls["puts"].append(headers["Content-Range"])
+        done = headers["Content-Range"].endswith("2499/2500")
+        return _resp(200 if done else 308, {"id": "abc123"})
+
+    youtube.requests.post, youtube.requests.put = fake_post, fake_put
+    post = {"title": "T", "body": "D", "tags": ["a"],
+            "media": [{"path": str(video), "type": "video", "thumb": str(thumb)}],
+            "meta": {"youtube": {"privacy": "unlisted", "category_id": "27", "short": False}}}
+    assert youtube.publish(post, {}) == "https://youtu.be/abc123"
+    assert calls["puts"] == ["bytes 0-999/2500", "bytes 1000-1999/2500", "bytes 2000-2499/2500"]
+    assert calls["init"]["status"]["privacyStatus"] == "unlisted" and calls["init"]["snippet"]["categoryId"] == "27"
+    assert calls.get("thumb")
+
+
+def test_linkedin_video_upload():
+    from creatoros.publishers import linkedin
+
+    video = Path(tempfile.mkdtemp()) / "v.mp4"
+    video.write_bytes(b"y" * 300)
+    calls = {"parts": []}
+
+    def fake_post(url, **kw):
+        if "initializeUpload" in url:
+            return _resp(200, {"value": {"video": "urn:li:video:1", "uploadToken": "t", "uploadInstructions": [
+                {"uploadUrl": "https://u/1", "firstByte": 0, "lastByte": 199},
+                {"uploadUrl": "https://u/2", "firstByte": 200, "lastByte": 299}]}})
+        if "finalizeUpload" in url:
+            calls["final"] = kw["json"]
+            return _resp(200)
+        calls["post"] = kw["json"]
+        return _resp(201, headers={"x-restli-id": "urn:li:share:7"})
+
+    def fake_put(url, data=None, **kw):
+        calls["parts"].append(len(data))
+        return _resp(200, headers={"ETag": f'"etag{len(calls["parts"])}"'})
+
+    linkedin.requests.post, linkedin.requests.put = fake_post, fake_put
+    linkedin.requests.get = lambda url, **kw: _resp(200, {"status": "AVAILABLE"})
+    linkedin.env = lambda k, d=None: {"LINKEDIN_ACCESS_TOKEN": "tok", "LINKEDIN_PERSON_URN": "urn:li:person:abc"}.get(k, d)
+    post = {"id": 2, "kind": "video", "title": "Demo", "body": "yt desc",
+            "media": [{"path": str(video), "type": "video"}], "meta": {"linkedin_text": "My demo #AI"}}
+    assert linkedin.publish(post, {}).endswith("urn:li:share:7/")
+    assert calls["parts"] == [200, 100]
+    assert calls["final"]["finalizeUploadRequest"]["uploadedPartIds"] == ["etag1", "etag2"]
+    assert calls["post"]["content"]["media"]["id"] == "urn:li:video:1"
+    assert calls["post"]["commentary"].startswith("My demo")
+
+
+def test_custom_webhook_platform():
+    import base64 as b64
+
+    from creatoros import connections, publishers
+    from creatoros.publishers import webhook
+
+    connections.STORE = Path(tempfile.mkdtemp()) / "connections.json"
+    try:
+        connections.save_custom(None, {"name": "Insta", "url": "ftp://bad"})
+        raise AssertionError("bad URL should be rejected")
+    except ValueError:
+        pass
+    cid = connections.save_custom(None, {"name": "Instagram via Zapier", "url": "https://hooks.example/abc",
+                                         "auth_header": "X-Key", "api_key": "secret"})
+    assert cid == "instagram-via-zapier"
+    assert publishers.is_target(f"custom:{cid}") and not publishers.is_target("custom:nope")
+    cfg = setup()
+    cfg["publish"]["targets"] = ["markdown", f"custom:{cid}"]
+    assert validate(cfg) == []
+    connections.save_custom(cid, {"name": "Instagram via Zapier", "url": "https://hooks.example/abc"})
+    assert connections.list_custom()[cid]["api_key"] == "secret", "empty key field keeps the saved key"
+
+    img = Path(tempfile.mkdtemp()) / "a.jpg"
+    img.write_bytes(b"IMG")
+    sent = {}
+
+    def fake_request(method, url, json=None, headers=None, timeout=None):
+        sent.update(method=method, url=url, json=json, headers=headers)
+        return _resp(200, {"url": "https://instagram.com/p/xyz"})
+
+    webhook.requests.request = fake_request
+    post = {"id": 5, "kind": "social", "title": "Certs", "body": "My certs #AWS", "tags": ["AWS"],
+            "media": [{"path": str(img), "alt": "cert"}], "published": {}}
+    assert publishers.publish_to(f"custom:{cid}", post, cfg) == "https://instagram.com/p/xyz"
+    assert sent["headers"]["X-Key"] == "secret" and sent["json"]["text"] == "My certs #AWS"
+    assert b64.b64decode(sent["json"]["media"][0]["data_base64"]) == b"IMG"
+    connections.delete_custom(cid)
+    assert not publishers.is_target(f"custom:{cid}")
 
 
 def test_personas():

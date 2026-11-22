@@ -108,6 +108,9 @@ publish:
   medium: { publish_status: draft, notify_followers: false }
   devto: { published: false }
   linkedin: { visibility: PUBLIC, api_version: "202610" }   # PUBLIC or CONNECTIONS
+  # YouTube defaults (each video job can override privacy/category in the dashboard).
+  # Category ids: 28 Science & Technology, 27 Education, 22 People & Blogs, 24 Entertainment, 20 Gaming
+  youtube: { privacy: private, category_id: "28", upload_thumbnail: true }
 
 dashboard:
   host: 127.0.0.1     # use 0.0.0.0 on the lab cluster (and set DASHBOARD_TOKEN in .env)

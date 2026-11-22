@@ -12,7 +12,7 @@ import re
 import secrets
 import time
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
 
 import requests
 
@@ -133,11 +133,55 @@ def _upload_image(path: str, token: str, owner: str, version: str) -> str:
     return value["image"]
 
 
+VIDEO_MAX_BYTES = 500 * 1024 * 1024
+
+
+def _upload_video(path: str, token: str, owner: str, version: str) -> str:
+    """Multi-part upload via the Videos API. Returns the video URN."""
+    p = Path(path)
+    size = p.stat().st_size
+    if size > VIDEO_MAX_BYTES:
+        raise RuntimeError("LinkedIn videos must be under 500 MB")
+    r = requests.post(f"{API}/rest/videos?action=initializeUpload", headers=_headers(token, version), timeout=30,
+                      json={"initializeUploadRequest": {"owner": owner, "fileSizeBytes": size,
+                                                        "uploadCaptions": False, "uploadThumbnail": False}})
+    if r.status_code >= 400:
+        raise RuntimeError(f"LinkedIn video upload init failed ({r.status_code}): {r.text[:300]}")
+    value = r.json()["value"]
+    etags = []
+    with open(p, "rb") as f:
+        for part in value["uploadInstructions"]:
+            f.seek(part["firstByte"])
+            chunk = f.read(part["lastByte"] - part["firstByte"] + 1)
+            up = requests.put(part["uploadUrl"], data=chunk, timeout=600,
+                              headers={"Content-Type": "application/octet-stream"})
+            if up.status_code >= 400:
+                raise RuntimeError(f"LinkedIn video part upload failed ({up.status_code})")
+            etags.append(up.headers.get("ETag", "").strip('"'))
+    fin = requests.post(f"{API}/rest/videos?action=finalizeUpload", headers=_headers(token, version), timeout=60,
+                        json={"finalizeUploadRequest": {"video": value["video"], "uploadToken": value.get("uploadToken", ""),
+                                                        "uploadedPartIds": etags}})
+    if fin.status_code >= 400:
+        raise RuntimeError(f"LinkedIn video finalize failed ({fin.status_code}): {fin.text[:300]}")
+    # Wait (up to ~3 min) for LinkedIn to process the video before posting.
+    for _ in range(36):
+        s = requests.get(f"{API}/rest/videos/{quote(value['video'], safe='')}", headers=_headers(token, version), timeout=30)
+        state = s.json().get("status") if s.ok else None
+        if state == "AVAILABLE":
+            break
+        if state == "PROCESSING_FAILED":
+            raise RuntimeError("LinkedIn could not process this video (check format: MP4, 3 s - 30 min)")
+        time.sleep(5)
+    return value["video"]
+
+
 def publish(post: dict, opts: dict) -> str:
     token, urn = _token()
     version = str(opts.get("api_version") or DEFAULT_VERSION)
     body = post["body"]
-    if post.get("kind") != "social":  # blog post shared to LinkedIn: teaser + link
+    if post.get("kind") == "video":
+        body = (post.get("meta") or {}).get("linkedin_text") or post["body"]
+    elif post.get("kind") != "social":  # blog post shared to LinkedIn: teaser + link
         link = next(iter((post.get("published") or {}).values()), "")
         body = f"{post['title']}\n\n{post.get('subtitle', '')}\n\n{link}".strip()
     if len(body) > MAX_CHARS:
@@ -151,13 +195,18 @@ def publish(post: dict, opts: dict) -> str:
         "lifecycleState": "PUBLISHED",
         "isReshareDisabledByAuthor": False,
     }
-    media = [m for m in (post.get("media") or []) if Path(m["path"]).exists()][:20]
-    images = [{"id": _upload_image(m["path"], token, urn, version), "altText": m.get("alt", "")[:120]}
-              for m in media]
-    if len(images) == 1:
-        payload["content"] = {"media": images[0]}
-    elif len(images) > 1:
-        payload["content"] = {"multiImage": {"images": images}}
+    media = [m for m in (post.get("media") or []) if Path(m["path"]).exists()]
+    video = next((m for m in media if m.get("type") == "video"), None)
+    if video:
+        payload["content"] = {"media": {"id": _upload_video(video["path"], token, urn, version),
+                                        "title": post["title"][:200]}}
+    else:
+        images = [{"id": _upload_image(m["path"], token, urn, version), "altText": m.get("alt", "")[:120]}
+                  for m in media[:20]]
+        if len(images) == 1:
+            payload["content"] = {"media": images[0]}
+        elif len(images) > 1:
+            payload["content"] = {"multiImage": {"images": images}}
 
     r = requests.post(f"{API}/rest/posts", headers=_headers(token, version), json=payload, timeout=60)
     if r.status_code >= 400:

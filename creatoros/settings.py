@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from .modules.blog.angles import all_angles
 from .personas import PERSONAS
-from .publishers import PUBLISHERS
+from .publishers import is_target
 
 TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 EFFORTS = {None, "", "low", "medium", "high", "xhigh", "max"}
@@ -56,7 +56,7 @@ def validate(cfg: dict) -> list[str]:
             errors.append(f"Provider '{name}': base_url must start with http")
 
     for t in cfg.get("publish", {}).get("targets", []):
-        if t not in PUBLISHERS:
+        if not is_target(t):
             errors.append(f"Unknown publish target '{t}'")
     status = cfg.get("publish", {}).get("medium", {}).get("publish_status", "draft")
     if status not in ("draft", "public", "unlisted"):

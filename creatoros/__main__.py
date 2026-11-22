@@ -4,6 +4,7 @@
     python -m creatoros scout                 # show today's candidate stories
     python -m creatoros write --angle news    # write one post now (optionally --topic "...")
     python -m creatoros folder D:\Certs -i "share all in one post" --to linkedin
+    python -m creatoros video D:\Videos\demo.mp4 -i "FastAPI tutorial" --to youtube,linkedin
     python -m creatoros list                  # list posts
     python -m creatoros publish 3             # publish post #3
     python -m creatoros telegram-chat-id      # find your Telegram chat id
@@ -82,6 +83,17 @@ def cmd_folder(cfg, args):
         print(f"\nPost #{pid} [{p['status']}] -> {', '.join(p['targets'])} at {p['scheduled_at']}\n{p['body']}\n")
 
 
+def cmd_video(cfg, args):
+    from .modules.video import posting
+    ids = posting.create_posts(cfg, args.path, args.instructions or "", args.to.split(","), args.privacy,
+                               args.category, args.interval, transcribe=not args.no_transcript,
+                               notify_user=not args.no_notify, role=args.role)
+    for pid in ids:
+        p = db.get_post(pid)
+        print(f"\nPost #{pid} [{p['status']}] -> {', '.join(p['targets'])} at {p['scheduled_at']}\n"
+              f"TITLE: {p['title']}\nTAGS: {', '.join(p['tags'])}\n\n{p['body']}\n")
+
+
 def cmd_list(cfg, _):
     for p in db.list_posts(30):
         print(f"#{p['id']:<4} {p['status']:<10} {p['angle']:<9} {p['title']}")
@@ -142,6 +154,16 @@ def main(argv=None):
     fo.add_argument("--interval", type=float, default=24, help="hours between series posts")
     fo.add_argument("--role", help="agent role, e.g. personal_brand")
     fo.add_argument("--no-notify", action="store_true")
+    vi = sub.add_parser("video", help="write YouTube/LinkedIn metadata for a video or folder of videos")
+    vi.add_argument("path")
+    vi.add_argument("--instructions", "-i", default="")
+    vi.add_argument("--to", default="youtube", help="comma-separated: youtube,linkedin")
+    vi.add_argument("--privacy", choices=["private", "unlisted", "public"], default="private")
+    vi.add_argument("--category", default="28", help="YouTube category id (28 = Science & Technology)")
+    vi.add_argument("--interval", type=float, default=24, help="hours between videos")
+    vi.add_argument("--role")
+    vi.add_argument("--no-transcript", action="store_true")
+    vi.add_argument("--no-notify", action="store_true")
     sub.add_parser("list")
     p = sub.add_parser("publish")
     p.add_argument("id", type=int)
@@ -152,7 +174,8 @@ def main(argv=None):
     setup_logging()
     cfg = load_config(args.config)
     db.init()
-    handlers = {"check": cmd_check, "scout": cmd_scout, "write": cmd_write, "folder": cmd_folder, "list": cmd_list,
+    handlers = {"check": cmd_check, "scout": cmd_scout, "write": cmd_write, "folder": cmd_folder, "video": cmd_video,
+                "list": cmd_list,
                 "publish": cmd_publish, "telegram-chat-id": cmd_chat_id, "run": cmd_run}
     try:
         return handlers[args.cmd](cfg, args) or 0

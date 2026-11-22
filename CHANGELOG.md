@@ -19,6 +19,17 @@ All notable changes are listed here. The project follows [Semantic Versioning](h
   when due. "Publish now" in the dashboard.
 - Telegram previews include the post images.
 - Image input for models (Claude and OpenAI-compatible vision models).
+- **Video → post**: inspect a video or folder (ffprobe, sampled frames, optional local
+  faster-whisper transcript); the writer produces YouTube title, description, tags, chapters,
+  thumbnail choice and a LinkedIn caption. Vertical clips up to 3 minutes become Shorts.
+  Dashboard tab and `python -m creatoros video`.
+- **YouTube publisher**: Google OAuth with refresh token, resumable chunked upload with retries,
+  custom thumbnail.
+- **LinkedIn video**: multi-part Videos API upload, finalize and processing wait.
+- **Connections redesign** for non-developers: platform tiles with step-by-step setup windows,
+  Test buttons, Telegram "Find my chat ID", copy-able redirect URLs.
+- **＋ Add a platform**: custom platforms via any webhook/API URL (Zapier, Make, n8n…), with
+  optional auth header, media as base64, and "Send test".
 
 ### Changed
 - `start_creatoros.bat` uses the project's `.venv` when present.

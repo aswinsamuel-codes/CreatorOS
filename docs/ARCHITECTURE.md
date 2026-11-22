@@ -64,12 +64,20 @@ saved as `kind: social` posts with `media`, `targets` and `scheduled_at` →
 `pipeline.approve()` publishes now or marks `scheduled` → `pipeline.publish_due()` (every
 2 minutes) publishes due posts. See [FOLDER_POSTS.md](FOLDER_POSTS.md).
 
+## Video → post pipeline
+
+`creatoros/modules/video/videoinfo.py` (ffprobe, frame extraction, optional faster-whisper)
+and `posting.py` (one `kind: video` post per file; YouTube settings and the LinkedIn caption
+live in the post's `meta`). Publishers: `youtube.py` (Google OAuth, resumable upload),
+`linkedin.py` (Videos API), `webhook.py` (custom platforms). See [VIDEO_POSTS.md](VIDEO_POSTS.md).
+
 ## Agent roles and connections
 
 - `creatoros/personas.py`: built-in roles plus custom; `profile.author_context()` puts
   role + profile + documents at the top of every writer prompt.
-- `creatoros/connections.py`: OAuth tokens and keys from the dashboard in
-  `data/connections.json`; `config.env()` checks `.env` first, then this store.
+- `creatoros/connections.py`: platform catalogue (tiles, setup steps, fields), OAuth tokens,
+  keys and custom webhook platforms in `data/connections.json`; `config.env()` checks `.env`
+  first, then this store. Custom platforms publish as targets named `custom:<id>`.
 - `creatoros/publishers/linkedin.py`: OAuth (authorization code flow with `state`),
   Images API upload, Posts API (single or multi-image).
 

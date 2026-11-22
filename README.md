@@ -25,9 +25,16 @@ It reads every file (images and PDFs), writes LinkedIn posts in your voice, and 
 as one multi-image post or as a series (e.g. one a day) after your approval.
 See [docs/FOLDER_POSTS.md](docs/FOLDER_POSTS.md).
 
-### Connections
-Connect LinkedIn with its official login (no passwords stored) and paste API keys for
-Medium, dev.to, Telegram and Claude in the dashboard. See [docs/CONNECTIONS.md](docs/CONNECTIONS.md).
+### Video → post (YouTube, LinkedIn)
+Give it a video or a folder of videos. It watches sample frames (and the transcript), writes
+the YouTube title, description, tags and chapters plus a LinkedIn caption, and uploads after
+your approval. Vertical clips go out as YouTube Shorts. See [docs/VIDEO_POSTS.md](docs/VIDEO_POSTS.md).
+
+### Connections, made for everyone
+Click a platform's tile and follow the steps: Claude, Telegram, LinkedIn, YouTube, Medium,
+dev.to. LinkedIn and YouTube use their official login pages, so no passwords are stored. Use
+**＋ Add a platform** to connect any other app through its API or a Zapier/Make/n8n webhook.
+See [docs/CONNECTIONS.md](docs/CONNECTIONS.md).
 
 ### Agent roles
 Choose how the agent thinks and writes: tech blogger, marketing strategist, developer
@@ -132,6 +139,7 @@ open `http://<host>:8787/?token=<your token>`.
 | [Telegram](docs/TELEGRAM.md) | Bot setup, approval buttons, commands |
 | [Connections](docs/CONNECTIONS.md) | LinkedIn official login, API keys |
 | [Folder → post](docs/FOLDER_POSTS.md) | Turning certificates/screenshots/photos into posts |
+| [Video → post](docs/VIDEO_POSTS.md) | YouTube/LinkedIn video uploads with AI-written metadata |
 | [Contributing](CONTRIBUTING.md) | Dev setup, tests, guidelines, releases |
 | [Changelog](CHANGELOG.md) | What changed in each version |
 

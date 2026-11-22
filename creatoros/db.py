@@ -9,7 +9,8 @@ from .config import DATA_DIR
 
 DB_PATH = DATA_DIR / "creatoros.db"
 _lock = threading.Lock()
-JSON_FIELDS = ("sources", "tags", "published", "media", "targets")
+JSON_FIELDS = ("sources", "tags", "published", "media", "targets", "meta")
+DICT_FIELDS = ("published", "meta")
 
 # Columns added after v0.1 (added automatically to older databases).
 MIGRATIONS = {
@@ -17,6 +18,7 @@ MIGRATIONS = {
     "media": "TEXT",                 # [{"path": "...", "alt": "..."}]
     "targets": "TEXT",               # per-post publish targets, e.g. ["linkedin"]
     "scheduled_at": "TEXT",          # publish at/after this time (ISO)
+    "meta": "TEXT",                  # platform-specific extras, e.g. {"linkedin_text": "...", "youtube": {...}}
 }
 
 SCHEMA = """
@@ -69,7 +71,7 @@ def _decode(row: sqlite3.Row | None) -> dict | None:
         return None
     d = dict(row)
     for k in JSON_FIELDS:
-        d[k] = json.loads(d[k]) if d.get(k) else ({} if k == "published" else [])
+        d[k] = json.loads(d[k]) if d.get(k) else ({} if k in DICT_FIELDS else [])
     d["kind"] = d.get("kind") or "blog"
     return d
 
