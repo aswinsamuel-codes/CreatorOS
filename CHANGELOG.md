@@ -13,6 +13,12 @@ All notable changes are listed here. The project follows [Semantic Versioning](h
 - **Token usage meters**: every AI request is counted; each AI tile shows a 0-100% bar of a
   monthly token budget (editable) plus input/output tokens, requests and today's usage.
 
+- **Automatic retries and backup models**: temporary errors (server busy, dropped connection,
+  timeout) are retried; if a model stays overloaded, CreatorOS switches to the provider's
+  `fallback_models` (Gemini: `gemini-2.5-flash`, then `gemini-flash-lite-latest`).
+- Model dropdowns hide non-text models (music, image, robotics, live voice) and list stable
+  "latest" models first.
+
 ### Fixed
 - Claude Test now catches accounts without API credits; plain-language errors for credits,
   quota, rate limits, bad keys and unknown models (Claude, OpenAI, Gemini).

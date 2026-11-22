@@ -7,6 +7,7 @@ Two provider types cover almost everything:
 
 import json
 import re
+import time
 
 import requests
 
@@ -98,8 +99,11 @@ class AnthropicLLM:
 
 
 class OpenAICompatibleLLM:
-    def __init__(self, model: str, base_url: str, api_key: str | None = None, provider: str = "", **_):
+    def __init__(self, model: str, base_url: str, api_key: str | None = None, provider: str = "",
+                 fallbacks: list[str] | None = None, timeout: int = 180, **_):
         self.provider = provider or _provider_name(base_url).lower()
+        self.fallbacks = list(fallbacks or [])
+        self.timeout = timeout
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
@@ -123,25 +127,62 @@ class OpenAICompatibleLLM:
         # OpenAI's newer models only accept max_completion_tokens; other servers expect max_tokens.
         length_key = "max_completion_tokens" if "api.openai.com" in self.base_url else "max_tokens"
         body[length_key] = max_tokens
-        r = self._post(body, headers)
-        if r.status_code == 400 and "max_tokens" in r.text and length_key == "max_tokens":
-            body["max_completion_tokens"] = body.pop("max_tokens")
-            r = self._post(body, headers)
-        if r.status_code >= 400:
-            raise LLMError(friendly_http_error(self.base_url, r.status_code, r.text))
-        data = r.json()
-        usage = data.get("usage") or {}
-        record_usage(self.provider, self.model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
-        choice = data["choices"][0]
-        text = (choice.get("message") or {}).get("content") or ""
-        # Reasoning models (Qwen, DeepSeek...) may include their thinking inline.
-        return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
 
-    def _post(self, body: dict, headers: dict) -> requests.Response:
-        try:
-            return requests.post(f"{self.base_url}/chat/completions", json=body, headers=headers, timeout=900)
-        except requests.RequestException as e:
-            raise LLMError(f"Could not reach {self.base_url} - is the server running and reachable? ({e})") from e
+        # Try the chosen model, then each backup model if it stays overloaded.
+        last_error = None
+        models = [self.model] + [m for m in self.fallbacks if m != self.model]
+        for n, model in enumerate(models):
+            body["model"] = model
+            # With a backup available, don't keep hammering a busy model: one retry, then move on.
+            attempts = 2 if n < len(models) - 1 else 3
+            try:
+                r = self._post_with_retries(body, headers, attempts)
+            except _Overloaded as e:
+                last_error = e
+                log.warning("%s %s is overloaded/unreachable (%s) - trying a backup model", self.provider, model, e)
+                continue
+            if r.status_code == 400 and "max_tokens" in r.text and "max_tokens" in body:
+                body["max_completion_tokens"] = body.pop("max_tokens")
+                r = self._post_with_retries(body, headers)
+            if r.status_code >= 400:
+                raise LLMError(friendly_http_error(self.base_url, r.status_code, r.text))
+            if model != self.model:
+                log.info("Used backup model %s instead of %s", model, self.model)
+            data = r.json()
+            usage = data.get("usage") or {}
+            record_usage(self.provider, model, usage.get("prompt_tokens", 0), usage.get("completion_tokens", 0))
+            choice = data["choices"][0]
+            text = (choice.get("message") or {}).get("content") or ""
+            # Reasoning models (Qwen, DeepSeek...) may include their thinking inline.
+            return re.sub(r"<think>.*?</think>", "", text, flags=re.S).strip()
+        name = _provider_name(self.base_url)
+        raise LLMError(f"{name} is overloaded or not responding right now (tried {', '.join([self.model] + self.fallbacks)}). "
+                       f"CreatorOS will try again on the next run. Details: {last_error}")
+
+    def _post_with_retries(self, body: dict, headers: dict, attempts: int = 3) -> requests.Response:
+        """Retry temporary failures (server busy, dropped connection, timeout) with a short backoff."""
+        problem = ""
+        for i in range(attempts):
+            try:
+                r = requests.post(f"{self.base_url}/chat/completions", json=body, headers=headers, timeout=self.timeout)
+            except requests.RequestException as e:
+                problem = f"{type(e).__name__}"
+            else:
+                if r.status_code not in (500, 502, 503, 504):
+                    return r
+                problem = f"HTTP {r.status_code}: {_short_error(r.text)}"
+            if i < attempts - 1:
+                time.sleep(4 * (i + 1))
+        raise _Overloaded(problem)
+
+
+class _Overloaded(Exception):
+    pass
+
+
+def _short_error(text: str) -> str:
+    m = re.search(r'"message"\s*:\s*"([^"]+)"', text or "")
+    return (m.group(1) if m else (text or ""))[:160]
 
 
 def _provider_name(base_url: str) -> str:
@@ -168,7 +209,17 @@ def friendly_http_error(base_url: str, status: int, text: str) -> str:
 
 
 CHAT_EXCLUDE = ("embed", "whisper", "tts", "dall-e", "moderation", "image", "audio", "realtime", "transcribe",
-                "search", "computer-use", "aqa", "imagen", "veo", "learnlm", "babbage", "davinci", "codex")
+                "search", "computer-use", "aqa", "imagen", "veo", "learnlm", "babbage", "davinci", "codex",
+                # non-text Gemini families (music, world models, image, robotics, live voice, agents)
+                "lyria", "genie", "banana", "robotics", "-live", "antigravity", "translate", "customtools")
+
+
+def _model_rank(model_id: str) -> tuple:
+    """Stable 'latest' aliases first, then released models, then previews/experiments."""
+    m = model_id.lower()
+    alias = 0 if m.endswith("-latest") else 1
+    unstable = 1 if any(x in m for x in ("preview", "exp", "experimental")) else 0
+    return alias, unstable
 
 
 def list_models(cfg: dict, provider: str) -> list[str]:
@@ -184,8 +235,8 @@ def list_models(cfg: dict, provider: str) -> list[str]:
     if r.status_code >= 400:
         raise LLMError(friendly_http_error(prov["base_url"], r.status_code, r.text))
     ids = [m["id"].removeprefix("models/") for m in r.json().get("data", [])]
-    ids = [i for i in ids if not any(x in i.lower() for x in CHAT_EXCLUDE)]
-    return sorted(set(ids), reverse=True)
+    ids = sorted(set(i for i in ids if not any(x in i.lower() for x in CHAT_EXCLUDE)), reverse=True)
+    return sorted(ids, key=_model_rank)  # stable sort keeps newest-first inside each group
 
 
 def cheapest(models: list[str]) -> str | None:
@@ -206,7 +257,8 @@ def get_llm(cfg: dict, role: str):
         return AnthropicLLM(spec["model"], api_key=api_key, effort=spec.get("effort"), provider=spec["provider"])
     if provider["type"] == "openai_compatible":
         return OpenAICompatibleLLM(spec["model"], base_url=provider["base_url"], api_key=api_key,
-                                   provider=spec["provider"])
+                                   provider=spec["provider"], fallbacks=provider.get("fallback_models"),
+                                   timeout=int(provider.get("timeout", 180)))
     raise ValueError(f"Unknown provider type: {provider['type']}")
 
 

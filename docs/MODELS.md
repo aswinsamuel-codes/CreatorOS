@@ -22,6 +22,20 @@ Dashboard → **Connections** → click Claude, Gemini or OpenAI → paste the k
 pick a model under **Use this AI** → **Use for writing** / **Use for picking stories**.
 Each AI tile also shows a monthly token usage meter.
 
+## When a model is busy
+
+Popular new models are sometimes overloaded ("high demand"). CreatorOS retries temporary
+errors, then switches to the provider's backup models:
+
+```yaml
+providers:
+  gemini:
+    fallback_models: [gemini-2.5-flash, gemini-flash-lite-latest]
+    timeout: 180          # seconds per attempt
+```
+
+The log shows "Used backup model …" when that happens.
+
 ## Claude (default)
 
 ```yaml

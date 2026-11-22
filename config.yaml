@@ -46,6 +46,8 @@ providers:
     type: openai_compatible
     base_url: https://generativelanguage.googleapis.com/v1beta/openai
     api_key_env: GEMINI_API_KEY
+    # Used automatically when the chosen model is overloaded (Google's newest models often are).
+    fallback_models: [gemini-2.5-flash, gemini-flash-lite-latest]
 
 # ---------------------------------------------------------------------------
 # Blog module

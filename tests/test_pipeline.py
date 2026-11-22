@@ -506,6 +506,36 @@ def test_ai_providers_and_usage():
     assert models == ["gemini-9-pro", "gemini-9-flash"] and llm.cheapest(models) == "gemini-9-flash"
 
 
+def test_overloaded_model_uses_backup():
+    from creatoros import llm
+
+    setup()
+    llm.time.sleep = lambda s: None
+    calls = []
+
+    def post(url, json=None, headers=None, timeout=None):
+        calls.append(json["model"])
+        if json["model"] == "busy-model":
+            r = _resp(503)
+            r.text = '{"error": {"code": 503, "message": "This model is currently experiencing high demand."}}'
+            return r
+        return _resp(200, {"choices": [{"message": {"content": "Backup worked"}}], "usage": {}})
+
+    llm.requests.post = post
+    m = llm.OpenAICompatibleLLM("busy-model", "https://generativelanguage.googleapis.com/v1beta/openai", "k",
+                                provider="gemini", fallbacks=["backup-model"])
+    assert m.complete("s", "p") == "Backup worked"
+    assert calls == ["busy-model"] * 2 + ["backup-model"], calls  # one retry, then the backup
+
+    m2 = llm.OpenAICompatibleLLM("busy-model", "https://generativelanguage.googleapis.com/v1beta/openai", "k",
+                                 provider="gemini", fallbacks=[])
+    try:
+        m2.complete("s", "p")
+        raise AssertionError("should fail when every model is busy")
+    except llm.LLMError as e:
+        assert "overloaded" in str(e) and "high demand" in str(e)
+
+
 def test_personas():
     from creatoros.personas import persona_prompt
 
