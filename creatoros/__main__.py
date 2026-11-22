@@ -117,7 +117,7 @@ def cmd_chat_id(cfg, _):
         print(f"TELEGRAM_CHAT_ID={cid}    ({name})")
 
 
-def cmd_run(cfg, _):
+def cmd_run(cfg, args):
     import uvicorn
 
     from . import notify, scheduler
@@ -132,7 +132,11 @@ def cmd_run(cfg, _):
         log.info("Telegram not configured - approve posts in the dashboard")
     d = cfg.get("dashboard", {})
     host, port = d.get("host", "127.0.0.1"), d.get("port", 8787)
-    log.info("Dashboard: http://%s:%s", "localhost" if host in ("127.0.0.1", "0.0.0.0") else host, port)
+    url = f"http://{'localhost' if host in ('127.0.0.1', '0.0.0.0') else host}:{port}"
+    log.info("Dashboard: %s", url)
+    if not getattr(args, "no_browser", False):
+        import webbrowser
+        threading.Timer(2.0, lambda: webbrowser.open(url)).start()
     uvicorn.run(create_app(cfg, sched), host=host, port=port, log_level="warning")
 
 
@@ -168,7 +172,8 @@ def main(argv=None):
     p = sub.add_parser("publish")
     p.add_argument("id", type=int)
     sub.add_parser("telegram-chat-id")
-    sub.add_parser("run")
+    r = sub.add_parser("run")
+    r.add_argument("--no-browser", action="store_true", help="don't open the dashboard in a browser")
     args = parser.parse_args(argv)
 
     setup_logging()

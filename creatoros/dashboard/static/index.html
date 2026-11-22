@@ -370,8 +370,23 @@ const md = s => (window.marked && window.DOMPurify) ? DOMPurify.sanitize(marked.
 const csv = s => s.split(",").map(x => x.trim()).filter(Boolean);
 let current = null, NOTES = [], S = null, ANGLES = {};
 
+function showOffline() {
+  if ($("offline")) return;
+  document.body.insertAdjacentHTML("afterbegin", `<div id="offline" style="background:var(--red);color:#fff;border-bottom:var(--b);padding:16px 28px;font-weight:700">
+    ⚠️ The CreatorOS engine isn't running, so nothing can load yet.<br>
+    <span style="font-weight:500">Start it by double-clicking <b>start_creatoros.bat</b> in the CreatorOS folder (or run <code style="background:#fff;color:#111;padding:0 4px">python -m creatoros run</code>),
+    then open <a href="http://localhost:8787" style="color:#fff">http://localhost:8787</a>. This page retries automatically.</span></div>`);
+  setTimeout(async () => { try { await fetch("/api/status"); location.reload(); } catch { $("offline").remove(); showOffline(); } }, 5000);
+}
+if (location.protocol === "file:") setTimeout(showOffline, 0);
 async function api(path, method = "GET", body) {
-  const r = await fetch(path, { method, headers: { "Content-Type": "application/json", "x-token": TOKEN }, body: body ? JSON.stringify(body) : undefined });
+  let r;
+  try {
+    r = await fetch(path, { method, headers: { "Content-Type": "application/json", "x-token": TOKEN }, body: body ? JSON.stringify(body) : undefined });
+  } catch (e) {
+    showOffline();
+    throw new Error("CreatorOS engine isn't running - start it with start_creatoros.bat");
+  }
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.detail || r.statusText);
   return data;

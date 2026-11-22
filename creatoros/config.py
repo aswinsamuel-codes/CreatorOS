@@ -24,6 +24,8 @@ def setup_logging() -> None:
             logging.FileHandler(ROOT / "logs" / "creatoros.log", encoding="utf-8"),
         ],
     )
+    for noisy in ("apscheduler", "httpx", "httpx2", "anthropic"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 LOCAL_CONFIG = ROOT / "config.local.yaml"

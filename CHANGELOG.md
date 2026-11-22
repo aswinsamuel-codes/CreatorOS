@@ -2,7 +2,7 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org).
 
-## [Unreleased]
+## [0.4.0] - 2026-11-22
 
 ### Added
 - **Marketing agent**: campaigns from a goal, audience, offer and links → strategy (positioning,
@@ -14,8 +14,14 @@ All notable changes are listed here. The project follows [Semantic Versioning](h
 - **♻️ Repurpose** any post into other formats.
 - Marketing tab in the dashboard; campaign and format badges on posts.
 
+- `python -m creatoros run` (and `start_creatoros.bat`) open the dashboard in your browser
+  automatically (`--no-browser` to turn off).
+
 ### Fixed
 - Pop-up windows now also work outside the Connections tab.
+- When the CreatorOS engine isn't running (or the page was opened as a file), the dashboard shows
+  a clear red banner with how to start it, instead of silent errors and empty pages.
+- Quieter console output (scheduler and HTTP library logs only show warnings).
 
 ## [0.3.0] - 2026-11-22
 
