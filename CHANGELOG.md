@@ -2,6 +2,14 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org).
 
+## [Unreleased]
+
+### Added
+- **Documents** in My profile: upload a resume, portfolio or project write-ups (PDF, Word,
+  TXT, MD) or create text documents. They're converted to editable text, can be switched
+  on or off per document, and are given to the writer as background about the author, with
+  rules against leaking private details. Documents are ignored by git.
+
 ## [0.1.0] - 2026-11-22
 
 First public release.

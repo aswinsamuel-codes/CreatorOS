@@ -17,3 +17,4 @@ workspace/voices/*
 profile/profile.yaml
 profile/notes/*
 !profile/notes/README.md
+profile/documents/

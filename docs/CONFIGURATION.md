@@ -81,8 +81,32 @@ blog:
   avoid: [celebrity gossip, crypto price speculation, ...]
 ```
 
-Your voice and details come from `profile/profile.yaml`, and your own content from
-`profile/notes/`. Both can be edited in the dashboard's **My profile** tab.
+## Your profile, notes and documents
+
+Everything here lives on your machine only (ignored by git) and is edited in the
+dashboard's **My profile** tab.
+
+| What | Where | How the writer uses it |
+|---|---|---|
+| Profile | `profile/profile.yaml` (created from `profile.example.yaml` on first run) | Your name, role, voice, audience, opinions and call to action, in every post |
+| Notes | `profile/notes/*.md` | Each `personal` slot turns one unused note into a post |
+| Documents | `profile/documents/` | Background about you in every post (see below) |
+
+### Documents (resume, portfolio, projects...)
+
+Upload **PDF, Word (.docx), TXT or Markdown** files up to 10 MB, or create a text
+document directly. Each one is converted to plain text that you can edit (fix
+extraction mistakes, remove sections you don't want used).
+
+- Switch **Use in posts** on or off per document.
+- The writer uses them to add real experience and credibility where it fits, and is told
+  never to include phone numbers, emails, addresses, ID numbers or salaries.
+- Size cap: 8,000 characters per document and 20,000 in total go into each prompt, which
+  keeps costs predictable. Trim long documents to the parts that matter.
+- Scanned PDFs (images) have no text to extract. Paste the text into a new text document instead.
+
+Files: `profile/documents/<name>.md` (the text the writer reads),
+`profile/documents/originals/` (your uploads), `profile/documents/index.json` (on/off).
 
 ## Sources
 

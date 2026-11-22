@@ -8,7 +8,7 @@ import yaml
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 
-from .. import __version__, db, scheduler
+from .. import __version__, db, documents, scheduler
 from ..config import (EDITABLE_SECTIONS, ROOT, deep_merge, env, load_config, log, read_local_config_text,
                       reset_local_config, save_local_config, write_local_config_text)
 from ..modules.blog import pipeline
@@ -163,6 +163,37 @@ def create_app(cfg: dict, sched=None) -> FastAPI:
         except yaml.YAMLError as e:
             raise HTTPException(400, f"Invalid YAML: {e}")
         PROFILE_FILE.write_text(data["profile"], encoding="utf-8")
+        return {"ok": True}
+
+    # ----------------------------------------------------------- documents
+    def _doc(fn, *args, **kwargs):
+        try:
+            return fn(*args, **kwargs)
+        except documents.DocumentError as e:
+            raise HTTPException(400, str(e))
+
+    @app.get("/api/documents")
+    def docs_list():
+        return documents.list_documents()
+
+    @app.post("/api/documents")
+    def docs_upload(data: dict = Body(...)):
+        if data.get("data"):
+            return _doc(documents.add_document_b64, data.get("filename", ""), data["data"])
+        return _doc(documents.create_text_document, data.get("filename", ""), data.get("text", ""))
+
+    @app.get("/api/documents/{name}")
+    def docs_get(name: str):
+        return {"name": name, "text": _doc(documents.get_text, name)}
+
+    @app.put("/api/documents/{name}")
+    def docs_update(name: str, data: dict = Body(...)):
+        _doc(documents.update_document, name, text=data.get("text"), enabled=data.get("enabled"))
+        return {"ok": True}
+
+    @app.delete("/api/documents/{name}")
+    def docs_delete(name: str):
+        _doc(documents.delete_document, name)
         return {"ok": True}
 
     def _note_path(name: str) -> Path:

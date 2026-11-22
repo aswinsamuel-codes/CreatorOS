@@ -131,6 +131,22 @@
         <div class="row"><button class="btn green" onclick="saveNote()">Save note</button></div>
       </div>
     </div>
+    <div class="card">
+      <div class="tag-title bg-orange">📎 Your documents</div>
+      <p class="hint">Upload your resume, portfolio, project write-ups or research (PDF, Word, TXT, MD - max 10 MB).
+        They're converted to text you can edit. Documents switched <b>on</b> are read by the writer as background about you.
+        Private details (phone, email, address) are never put into posts. Files stay on this computer and are not committed to git.</p>
+      <div class="row">
+        <label class="btn yellow" style="margin:0">⬆️ Upload document<input type="file" id="docFile" accept=".pdf,.docx,.txt,.md" style="display:none" onchange="uploadDoc(this)"></label>
+        <button class="btn white" onclick="newTextDoc()">✍️ New text document</button>
+      </div>
+      <table><thead><tr><th>Use in posts</th><th>Document</th><th>Size</th><th>Uploaded</th><th></th></tr></thead><tbody id="docs"></tbody></table>
+      <div id="docEditor" style="display:none">
+        <label>Editing: <span id="docName"></span></label>
+        <textarea id="docText" style="min-height:360px"></textarea>
+        <div class="row"><button class="btn green" onclick="saveDoc()">Save document</button><button class="btn white" onclick="$('docEditor').style.display='none'">Close</button></div>
+      </div>
+    </div>
   </section>
 
   <!-- SETTINGS -->
@@ -279,7 +295,7 @@ const generate = () => safe(async () => {
 /* ---------------- profile ---------------- */
 async function loadProfile() {
   const r = await api("/api/profile");
-  $("profileText").value = r.profile; NOTES = r.notes;
+  $("profileText").value = r.profile; NOTES = r.notes; loadDocs();
   $("notes").innerHTML = r.notes.map((n, i) => `
     <div class="row" style="justify-content:space-between"><b>📄 ${esc(n.name)}</b>
     <span><button class="btn white sm" onclick="editNote(${i})">Edit</button> <button class="btn red sm" onclick="delNote(${i})">Delete</button></span></div>`).join("") || `<p class="hint">No notes yet.</p>`;
@@ -291,6 +307,44 @@ const saveNote = () => safe(async () => {
   await api(`/api/notes/${encodeURIComponent($("noteName").value.trim())}`, "PUT", { content: $("noteContent").value });
   $("noteName").value = $("noteContent").value = ""; toast("Note saved"); loadProfile();
 });
+/* ---------------- documents ---------------- */
+let DOCS = [], EDITING = null;
+async function loadDocs() {
+  DOCS = await api("/api/documents");
+  $("docs").innerHTML = DOCS.map((d, i) => `<tr>
+    <td><input type="checkbox" ${d.enabled ? "checked" : ""} onchange="toggleDoc(${i}, this.checked)"></td>
+    <td><b>📄 ${esc(d.name)}</b>${d.original ? `<div class="hint">${esc(d.original)}</div>` : ""}</td>
+    <td>${(d.chars / 1000).toFixed(1)}k chars</td><td>${esc((d.uploaded_at || "").replace("T", " "))}</td>
+    <td><button class="btn white sm" onclick="editDoc(${i})">Edit</button> <button class="btn red sm" onclick="delDoc(${i})">Delete</button></td></tr>`).join("")
+    || `<tr><td colspan="5" class="hint">No documents yet. Upload your resume to start.</td></tr>`;
+}
+function uploadDoc(input) {
+  const f = input.files[0]; input.value = ""; if (!f) return;
+  if (f.size > 10 * 1024 * 1024) return toast("File is larger than 10 MB", true);
+  const reader = new FileReader();
+  reader.onload = () => safe(async () => {
+    toast("Reading " + f.name + "…");
+    const r = await api("/api/documents", "POST", { filename: f.name, data: reader.result });
+    toast(`Added "${r.name}" (${r.chars} characters)`); loadDocs();
+  });
+  reader.readAsDataURL(f);
+}
+const newTextDoc = () => safe(async () => {
+  const name = prompt("Document name (e.g. projects, achievements):"); if (!name) return;
+  const r = await api("/api/documents", "POST", { filename: name, text: "" }); await loadDocs();
+  editDoc(DOCS.findIndex(d => d.name === r.name));
+});
+const editDoc = i => safe(async () => {
+  EDITING = DOCS[i].name; const r = await api(`/api/documents/${encodeURIComponent(EDITING)}`);
+  $("docName").textContent = EDITING; $("docText").value = r.text; $("docEditor").style.display = "block"; $("docText").focus();
+});
+const saveDoc = () => safe(async () => { await api(`/api/documents/${encodeURIComponent(EDITING)}`, "PUT", { text: $("docText").value }); toast("Document saved"); loadDocs(); });
+const toggleDoc = (i, on) => safe(async () => { await api(`/api/documents/${encodeURIComponent(DOCS[i].name)}`, "PUT", { enabled: on }); toast(on ? "Writer will use it" : "Writer will ignore it"); loadDocs(); });
+const delDoc = i => safe(async () => {
+  if (!confirm(`Delete "${DOCS[i].name}" and its uploaded file?`)) return;
+  await api(`/api/documents/${encodeURIComponent(DOCS[i].name)}`, "DELETE"); $("docEditor").style.display = "none"; toast("Deleted"); loadDocs();
+});
+
 const delNote = i => safe(async () => { if (confirm("Delete " + NOTES[i].name + "?")) { await api(`/api/notes/${encodeURIComponent(NOTES[i].name)}`, "DELETE"); loadProfile(); } });
 
 /* ---------------- settings ---------------- */

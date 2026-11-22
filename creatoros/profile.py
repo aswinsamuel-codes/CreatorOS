@@ -25,6 +25,22 @@ def load_profile() -> dict:
 
 
 def profile_prompt() -> str:
+    """Profile fields plus the author's enabled documents (resume etc.)."""
+    from .documents import documents_prompt
+
+    text = _profile_fields()
+    docs = documents_prompt()
+    if docs:
+        text += (
+            "\n\nAUTHOR DOCUMENTS (background about the author, e.g. resume, projects). Use them to add "
+            "genuine, relevant experience and credibility where it fits naturally - don't force it into "
+            "every post. Never include private details from them: no phone numbers, emails, home "
+            "addresses, ID numbers, salaries or names of private individuals.\n\n" + docs
+        )
+    return text
+
+
+def _profile_fields() -> str:
     p = load_profile()
     if not p:
         return "(no profile set)"

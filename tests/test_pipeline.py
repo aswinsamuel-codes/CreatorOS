@@ -84,6 +84,45 @@ def test_custom_angle():
     assert db.get_post(pid)["angle"] == "tutorial"
 
 
+def test_documents():
+    import io
+
+    from docx import Document
+
+    from creatoros import documents, profile
+
+    tmp = Path(tempfile.mkdtemp())
+    documents.DOCS_DIR, documents.ORIGINALS, documents.INDEX = tmp, tmp / "originals", tmp / "index.json"
+
+    buf = io.BytesIO()
+    d = Document()
+    d.add_paragraph("Aswin - AI engineer. Built a GPU cluster for local LLMs.")
+    d.add_paragraph("Phone: +91 99999 00000")
+    d.save(buf)
+    r = documents.add_document("My Resume.docx", buf.getvalue())
+    assert r["name"] == "my-resume"
+    assert "GPU cluster" in documents.get_text("my-resume")
+    assert (tmp / "originals" / "my-resume.docx").exists()
+
+    documents.update_document("my-resume", text="Edited: built a GPU cluster.")
+    assert "Edited" in profile.profile_prompt() and "Never include private details" in profile.profile_prompt()
+
+    documents.update_document("my-resume", enabled=False)
+    assert "Edited" not in profile.profile_prompt()
+
+    documents.create_text_document("projects", "Project list")
+    assert {x["name"] for x in documents.list_documents()} == {"my-resume", "projects"}
+
+    try:
+        documents.extract_text("virus.exe", b"x")
+        raise AssertionError("exe should be rejected")
+    except documents.DocumentError:
+        pass
+
+    documents.delete_document("my-resume")
+    assert not (tmp / "originals" / "my-resume.docx").exists()
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

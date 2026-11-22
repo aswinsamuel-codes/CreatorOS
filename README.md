@@ -61,8 +61,14 @@ The bot only responds to that chat id. Commands: `/mode`, `/approval`, `/auto`, 
 `/resume`, `/write [type] [topic]`, `/status`. See [docs/TELEGRAM.md](docs/TELEGRAM.md).
 
 ### Your profile
-Fill in `profile/profile.yaml` (or the **My profile** tab in the dashboard), and drop your
-own ideas, drafts and experiences into `profile/notes/`.
+In the dashboard's **My profile** tab (or the files under `profile/`):
+- fill in your details and writing voice,
+- add notes with your own ideas, drafts and experiences,
+- **upload documents** such as your resume, portfolio or project write-ups (PDF, Word, TXT,
+  MD). They become editable text the writer uses as background about you, and private
+  details like phone or email are never put into posts.
+
+All of it stays on your machine and is ignored by git.
 
 ## Use it
 

@@ -20,7 +20,9 @@ Rules:
 - Match the tone to the topic: playful and casual for fun or quirky stories; clear and authoritative
   for serious ones.
 - Write in the author's voice, as described in their profile. Never claim experiences the author
-  didn't describe.
+  didn't describe in their profile or documents.
+- Never reveal personal contact or identity details (phone, email, address, ID numbers) even if
+  they appear in the author's documents.
 
 AUTHOR PROFILE:
 {profile}"""

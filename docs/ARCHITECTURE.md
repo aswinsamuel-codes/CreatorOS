@@ -39,6 +39,10 @@ changes apply without a restart (except the dashboard's host/port).
 | 8. Publish | `publishers/` | Each target in `publish.targets` is tried; links are stored per platform. A failure on one target doesn't block the others. |
 | 9. Report | `notify/` | Telegram message with the live links (or the error). |
 
+The writer's system prompt is built by `profile.profile_prompt()`: your profile fields plus
+the text of every document switched on in `profile/documents/` (`creatoros/documents.py`
+extracts text from PDF with `pypdf` and from Word with `python-docx`, then caps the size).
+
 The `personal` post type skips steps 1-3 and uses the next unused note from
 `profile/notes/` instead.
 
