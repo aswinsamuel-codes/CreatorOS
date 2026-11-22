@@ -28,3 +28,4 @@ desktop/engine/dist/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
 desktop/src-tauri/binaries/creatoros-engine-*
+releases/

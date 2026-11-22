@@ -103,8 +103,9 @@
 </head>
 <body>
 <header>
-  <img src="/static/logo.png" alt="" width="52" height="52" style="margin-right:-8px" onerror="this.remove()">
-  <div class="logo">Creator<span>OS</span></div>
+  <img src="/static/logo.png" alt="CreatorOS" title="CreatorOS" width="60" height="60"
+       onerror="this.remove(); document.getElementById('logoText').style.display = ''">
+  <div class="logo" id="logoText" style="display:none">Creator<span>OS</span></div>
   <span class="ver" id="ver">v…</span>
   <div class="modes" title="Approval: every post waits for your OK. Auto: the agent publishes by itself and sends you the link.">
     <button id="m-approval" onclick="setMode('approval')">🤝 Approval</button><button id="m-auto" onclick="setMode('auto')">🤖 Auto</button>

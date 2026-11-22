@@ -45,7 +45,7 @@ def draw(size: int = 1024) -> Image.Image:
 SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <rect x="150" y="150" width="800" height="800" rx="150" fill="#111"/>
   <rect x="96" y="96" width="756" height="756" rx="128" fill="#ffd23f" stroke="#111" stroke-width="44"/>
-  <path d="M {x1:.1f} {y1:.1f} A 177 177 0 1 0 {x2:.1f} {y2:.1f}" fill="none" stroke="#111" stroke-width="118" stroke-linecap="round"/>
+  <path d="M {x1:.1f} {y1:.1f} A 177 177 0 1 1 {x2:.1f} {y2:.1f}" fill="none" stroke="#111" stroke-width="118" stroke-linecap="round"/>
   <circle cx="706" cy="490" r="74" fill="#111"/>
   <circle cx="690" cy="474" r="63" fill="#ff6b9d" stroke="#111" stroke-width="22"/>
   <circle cx="657" cy="441" r="20" fill="#fff"/>

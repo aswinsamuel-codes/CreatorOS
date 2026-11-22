@@ -1,6 +1,6 @@
-[package]
+﻿[package]
 name = "creatoros"
-version = "0.6.0"
+version = "0.6.1"
 description = "CreatorOS desktop app - runs the CreatorOS engine with a native window and tray icon"
 authors = ["CreatorOS contributors"]
 license = "MIT"

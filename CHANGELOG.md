@@ -2,6 +2,16 @@
 
 All notable changes are listed here. The project follows [Semantic Versioning](https://semver.org).
 
+## [0.6.1] - 2026-11-22
+
+### Fixed
+- The "C" in the opening animation (and `assets/logo.svg`) was mirrored; it now opens to the
+  right like the app icon.
+
+### Changed
+- Dashboard header shows only the logo (no text box next to it).
+- Opening animation no longer shows the "Your AI content studio" tagline.
+
 ## [0.6.0] - 2026-11-22
 
 ### Added
