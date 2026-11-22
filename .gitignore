@@ -1,0 +1,19 @@
+.env
+config.local.yaml
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/
+logs/
+workspace/output/*
+workspace/clips/*
+workspace/references/*
+workspace/music/*
+workspace/voices/*
+!workspace/**/.gitkeep
+
+# Your personal details and notes stay on your machine
+profile/profile.yaml
+profile/notes/*
+!profile/notes/README.md

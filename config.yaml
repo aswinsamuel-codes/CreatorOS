@@ -1,0 +1,104 @@
+# CreatorOS configuration. Secrets (API keys, tokens) go in .env, never here.
+#
+# These are the defaults. Changes you make in the dashboard's Settings tab are saved to
+# config.local.yaml (ignored by git) and override this file. See docs/CONFIGURATION.md.
+
+# Timezone for the schedule, e.g. Asia/Kolkata, Europe/London, America/New_York.
+# Empty = your computer's local time.
+timezone: ""
+
+# ---------------------------------------------------------------------------
+# Models: which provider + model each job uses.
+#   writer = writes the posts (quality matters)
+#   scout  = picks today's stories (cheap and fast is fine)
+# To use your lab cluster, change provider to "ollama" and model to e.g. "gemma3:27b".
+# ---------------------------------------------------------------------------
+models:
+  writer: { provider: claude, model: claude-opus-5-5, effort: medium }
+  scout:  { provider: claude, model: claude-haiku-5-5, effort: low }
+
+providers:
+  claude:
+    type: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+  ollama:
+    type: openai_compatible
+    base_url: http://localhost:11434/v1   # lab cluster: http://<cluster-ip>:11434/v1
+    api_key_env: ""
+  lmstudio:
+    type: openai_compatible
+    base_url: http://localhost:1234/v1
+    api_key_env: ""
+  openai:
+    type: openai_compatible
+    base_url: https://api.openai.com/v1
+    api_key_env: OPENAI_API_KEY
+  gemini:
+    type: openai_compatible
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+    api_key_env: GEMINI_API_KEY
+
+# ---------------------------------------------------------------------------
+# Blog module
+# ---------------------------------------------------------------------------
+blog:
+  words_min: 800
+  words_max: 1500
+  review_pass: false        # true = a second "editor" pass (better quality, ~2x cost)
+
+  # Daily slots (24h). Post types: news, future, business, personal, fun, or your own (below).
+  # "personal" uses your own notes from profile/notes/ (falls back to "future" if none left).
+  # Optional per slot:  days: "mon-fri"  (or "sat,sun")   enabled: false
+  schedule:
+    - { time: "09:00", angle: news }
+    - { time: "12:00", angle: future }
+    - { time: "15:00", angle: news }
+    - { time: "18:00", angle: business }
+    - { time: "21:00", angle: personal }
+
+  # Your own post types (optional). Use them in the schedule by name.
+  angles: {}
+  #   tutorial:
+  #     label: "Hands-on tutorial"
+  #     pick: "Pick a new tool or library readers can try today."
+  #     write: "Write a step-by-step tutorial with code snippets and common pitfalls."
+
+  topics: [AI, LLMs, robotics, chips, space tech, cybersecurity, startups, gadgets, quantum computing, biotech, future of work]
+  avoid: [celebrity gossip, politics without a tech angle, crypto price speculation]
+
+  sources:
+    hackernews: { enabled: true, limit: 40 }
+    reddit: { enabled: true, limit: 15, subreddits: [technology, Futurology, artificial, singularity] }
+    rss:
+      - https://techcrunch.com/feed/
+      - https://www.theverge.com/rss/index.xml
+      - https://feeds.arstechnica.com/arstechnica/index
+      - https://www.wired.com/feed/rss
+      - https://www.technologyreview.com/feed/
+
+# ---------------------------------------------------------------------------
+# Mode
+#   required: true  -> APPROVAL mode: every post waits for your OK (Telegram / dashboard)
+#   required: false -> AUTO mode: the agent publishes on its own and sends you the link
+# auto_publish_after_minutes (approval mode only): 0 = wait forever; e.g. 120 = publish
+# if you didn't answer within 2 hours.
+# Switch any time from the dashboard header or Telegram: /auto  /approval  /pause  /resume
+# ---------------------------------------------------------------------------
+approval:
+  required: true
+  auto_publish_after_minutes: 0
+
+paused: false     # true = scheduled slots are skipped until you resume
+
+# ---------------------------------------------------------------------------
+# Publishing targets: medium, devto, markdown (saves to workspace/output/blog/published)
+# Medium publish_status: draft | public | unlisted   (start with draft while testing!)
+# ---------------------------------------------------------------------------
+publish:
+  targets: [medium]
+  medium: { publish_status: draft, notify_followers: false }
+  devto: { published: false }
+
+dashboard:
+  host: 127.0.0.1     # use 0.0.0.0 on the lab cluster (and set DASHBOARD_TOKEN in .env)
+  port: 8787

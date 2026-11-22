@@ -1,0 +1,18 @@
+# Your personal details. The writer reads this before every post so the blog
+# sounds like YOU. Edit it here or in the dashboard ("My Profile" tab).
+
+name: ""                 # how you want to be referred to
+role: ""                 # e.g. "AI engineer and lab builder"
+bio: ""                  # 2-3 lines about you
+expertise: []            # e.g. [AI, distributed computing, home labs]
+experience: ""           # projects or stories the writer may mention
+voice: "Friendly, curious and direct. Explains complex tech simply. Uses examples from real projects."
+audience: "Developers, founders, students and tech-curious professionals from many fields"
+opinions: ""             # views you hold that posts can reflect
+call_to_action: "Follow me for daily posts on where tech is heading."
+links:
+  medium: ""
+  linkedin: ""
+  github: ""
+  x: ""
+never_say: []            # words/claims to avoid

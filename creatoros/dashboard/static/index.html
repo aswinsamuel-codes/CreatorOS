@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CreatorOS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+<style>
+  :root {
+    --ink:#111; --paper:#fff8e7; --white:#fff;
+    --yellow:#ffd23f; --pink:#ff6b9d; --blue:#4dc9ff; --lime:#b8ff5c; --orange:#ff9f1c; --red:#ff5252; --purple:#b49bff;
+    --b:3px solid var(--ink); --shadow:6px 6px 0 var(--ink); --shadow-sm:3px 3px 0 var(--ink);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--paper); color:var(--ink); font:16px/1.5 "Space Grotesk", system-ui, sans-serif;
+         background-image: radial-gradient(var(--ink) 1px, transparent 1px); background-size: 22px 22px; }
+  h1, h2, h3, .display { font-family:"Archivo Black", "Arial Black", sans-serif; letter-spacing:-.5px; }
+  header { display:flex; align-items:center; gap:20px; flex-wrap:wrap; padding:16px 28px; background:var(--yellow); border-bottom:var(--b); }
+  .logo { font-family:"Archivo Black", sans-serif; font-size:26px; background:var(--white); border:var(--b); box-shadow:var(--shadow-sm); padding:2px 12px; transform:rotate(-2deg); }
+  .logo span { color:var(--pink); }
+  .ver { font-weight:700; font-size:12px; border:2px solid var(--ink); background:var(--lime); padding:1px 8px; }
+  nav { display:flex; gap:10px; flex-wrap:wrap; margin-left:auto; }
+  nav button { font:700 15px "Space Grotesk", sans-serif; background:var(--white); border:var(--b); box-shadow:var(--shadow-sm); padding:6px 14px; cursor:pointer; transition:transform .08s, box-shadow .08s; }
+  nav button:hover { transform:translate(-1px,-1px); box-shadow:4px 4px 0 var(--ink); }
+  nav button.active { background:var(--pink); }
+  main { padding:28px; max-width:1280px; margin:0 auto; }
+  .tab { display:none; } .tab.active { display:block; }
+  .grid { display:grid; grid-template-columns:380px 1fr; gap:24px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+  @media (max-width:900px) { .grid, .grid2 { grid-template-columns:1fr; } }
+  .card { background:var(--white); border:var(--b); box-shadow:var(--shadow); padding:20px; margin-bottom:24px; }
+  .card > h2:first-child, .card > h3:first-child { margin-top:0; }
+  .card h2 { font-size:22px; } .card h3 { font-size:18px; }
+  .tag-title { display:inline-block; padding:2px 10px; border:var(--b); margin:0 0 14px; font-family:"Archivo Black", sans-serif; }
+  .bg-yellow{background:var(--yellow)} .bg-pink{background:var(--pink)} .bg-blue{background:var(--blue)} .bg-lime{background:var(--lime)} .bg-orange{background:var(--orange)} .bg-purple{background:var(--purple)}
+  .list { padding:0; max-height:76vh; overflow:auto; }
+  .item { padding:14px 16px; border-bottom:var(--b); cursor:pointer; }
+  .item:last-child { border-bottom:0; }
+  .item:hover { background:#fff1c1; } .item.sel { background:var(--yellow); }
+  .item .t { font-weight:700; } .item .m { font-size:13px; margin-top:4px; }
+  .badge { display:inline-block; font-size:12px; font-weight:700; padding:1px 8px; border:2px solid var(--ink); text-transform:uppercase; }
+  .s-pending { background:var(--orange); } .s-published { background:var(--lime); } .s-failed, .s-rejected { background:var(--red); color:#fff; } .s-approved { background:var(--blue); }
+  .btn { font:700 15px "Space Grotesk", sans-serif; background:var(--blue); color:var(--ink); border:var(--b); box-shadow:var(--shadow-sm); padding:8px 16px; cursor:pointer; transition:transform .08s, box-shadow .08s; }
+  .btn:hover { transform:translate(-1px,-1px); box-shadow:5px 5px 0 var(--ink); }
+  .btn:active { transform:translate(3px,3px); box-shadow:0 0 0 var(--ink); }
+  .btn.green { background:var(--lime); } .btn.pink { background:var(--pink); } .btn.red { background:var(--red); color:#fff; } .btn.white { background:var(--white); } .btn.yellow { background:var(--yellow); }
+  .btn.sm { padding:4px 10px; font-size:13px; }
+  input, textarea, select { width:100%; font:500 15px "Space Grotesk", sans-serif; background:var(--white); color:var(--ink); border:var(--b); padding:8px 10px; outline:none; }
+  input:focus, textarea:focus, select:focus { background:#fffbe0; box-shadow:var(--shadow-sm); }
+  input[type=checkbox] { width:22px; height:22px; accent-color:var(--ink); vertical-align:middle; }
+  textarea { min-height:120px; font-family:ui-monospace, Consolas, monospace; font-size:13px; }
+  label { display:block; font-weight:700; font-size:14px; margin:14px 0 6px; }
+  .hint { font-size:13px; color:#555; margin:4px 0 0; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:14px 0; }
+  .row > * { flex:0 0 auto; } .row .grow { flex:1 1 220px; }
+  .preview { line-height:1.75; border-top:var(--b); margin-top:18px; padding-top:8px; }
+  .preview h1 { font-size:30px; line-height:1.2; } .preview h2 { margin-top:28px; }
+  .preview a { color:var(--ink); background:var(--yellow); }
+  .preview code { background:#eee; padding:1px 4px; border:1px solid var(--ink); }
+  table { width:100%; border-collapse:collapse; }
+  th, td { text-align:left; padding:8px 6px; border-bottom:2px solid var(--ink); vertical-align:middle; }
+  th { font-family:"Archivo Black", sans-serif; font-weight:400; font-size:14px; }
+  .toast { position:fixed; bottom:24px; right:24px; max-width:420px; background:var(--lime); border:var(--b); box-shadow:var(--shadow); padding:12px 18px; font-weight:700; display:none; z-index:9; }
+  .toast.err { background:var(--red); color:#fff; }
+  .savebar { position:sticky; bottom:0; background:var(--yellow); border:var(--b); box-shadow:var(--shadow); padding:12px 16px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+  .empty { padding:24px; font-weight:700; }
+  .modes { display:flex; border:var(--b); box-shadow:var(--shadow-sm); }
+  .modes button { font:700 14px "Space Grotesk", sans-serif; border:0; background:var(--white); padding:6px 12px; cursor:pointer; }
+  .modes button + button { border-left:var(--b); }
+  .modes button.on { background:var(--ink); color:var(--yellow); }
+  #pauseBtn.paused { background:var(--red); color:#fff; }
+  .switch { display:flex; align-items:center; gap:10px; font-weight:700; margin:12px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Creator<span>OS</span></div>
+  <span class="ver" id="ver">v…</span>
+  <div class="modes" title="Approval: every post waits for your OK. Auto: the agent publishes by itself and sends you the link.">
+    <button id="m-approval" onclick="setMode('approval')">🤝 Approval</button><button id="m-auto" onclick="setMode('auto')">🤖 Auto</button>
+  </div>
+  <button class="btn white sm" id="pauseBtn" onclick="togglePause()">⏸ Pause</button>
+  <nav>
+    <button data-tab="posts" class="active">📝 Posts</button>
+    <button data-tab="write">⚡ Write now</button>
+    <button data-tab="profile">🙋 My profile</button>
+    <button data-tab="settings">⚙️ Settings</button>
+    <button data-tab="status">📡 Status</button>
+  </nav>
+</header>
+
+<main>
+  <!-- POSTS -->
+  <section id="posts" class="tab active">
+    <div class="grid">
+      <div class="card list" id="postList"></div>
+      <div class="card" id="postView"><h2>Pick a post 👈</h2><p>New posts land here (and on Telegram) for your approval.</p></div>
+    </div>
+  </section>
+
+  <!-- WRITE -->
+  <section id="write" class="tab">
+    <div class="card" style="max-width:680px">
+      <div class="tag-title bg-pink">Write a post now</div>
+      <label>Post type</label><select id="angle"></select>
+      <label>Topic (optional)</label>
+      <input id="topic" placeholder="e.g. AI agents in healthcare - or leave empty for today's best story">
+      <div class="row"><button class="btn green" onclick="generate()">⚡ Write it</button></div>
+      <p class="hint">Takes 1-3 minutes. The post appears in Posts and on Telegram.</p>
+    </div>
+  </section>
+
+  <!-- PROFILE -->
+  <section id="profile" class="tab">
+    <div class="grid2">
+      <div class="card">
+        <div class="tag-title bg-blue">About you</div>
+        <p class="hint">The writer reads this before every post so it sounds like you.</p>
+        <textarea id="profileText" style="min-height:440px"></textarea>
+        <div class="row"><button class="btn green" onclick="saveProfile()">Save profile</button></div>
+      </div>
+      <div class="card">
+        <div class="tag-title bg-lime">Your own content</div>
+        <p class="hint">Ideas, experiences, drafts. A "personal" slot turns one unused note into a post.</p>
+        <div id="notes"></div>
+        <label>Note name</label><input id="noteName" placeholder="my-lab-cluster">
+        <label>Content</label><textarea id="noteContent" style="min-height:200px"></textarea>
+        <div class="row"><button class="btn green" onclick="saveNote()">Save note</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="settings" class="tab">
+    <div class="card">
+      <div class="tag-title bg-yellow">🗓️ Daily schedule</div>
+      <div class="row">
+        <div class="grow"><label>Timezone</label>
+          <input id="tz" list="tzlist" placeholder="Empty = this computer's local time (e.g. Asia/Kolkata)">
+          <datalist id="tzlist"><option>Asia/Kolkata</option><option>Asia/Dubai</option><option>Asia/Singapore</option><option>Asia/Tokyo</option><option>Europe/London</option><option>Europe/Berlin</option><option>America/New_York</option><option>America/Chicago</option><option>America/Los_Angeles</option><option>Australia/Sydney</option><option>UTC</option></datalist>
+        </div>
+      </div>
+      <table><thead><tr><th>On</th><th>Time</th><th>Post type</th><th>Days</th><th></th></tr></thead><tbody id="slots"></tbody></table>
+      <div class="row"><button class="btn white sm" onclick="addSlot()">➕ Add slot</button></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="tag-title bg-pink">✍️ Writing</div>
+        <div class="row"><div class="grow"><label>Min words</label><input id="wmin" type="number" min="100"></div>
+          <div class="grow"><label>Max words</label><input id="wmax" type="number" min="200"></div></div>
+        <label class="switch"><input type="checkbox" id="review"> Editor review pass (better quality, ~2× cost)</label>
+        <label>Preferred topics (comma separated)</label><textarea id="topics" style="min-height:70px"></textarea>
+        <label>Avoid (comma separated)</label><textarea id="avoid" style="min-height:60px"></textarea>
+      </div>
+
+      <div class="card">
+        <div class="tag-title bg-blue">🤖 Models</div>
+        <div id="models"></div>
+        <h3>Providers</h3>
+        <p class="hint">Point "ollama" at your lab cluster, e.g. http://192.168.1.50:11434/v1. API keys stay in .env.</p>
+        <table><thead><tr><th>Name</th><th>Type</th><th>Base URL</th></tr></thead><tbody id="providers"></tbody></table>
+      </div>
+
+      <div class="card">
+        <div class="tag-title bg-lime">✅ Approval & publishing</div>
+        <label class="switch"><input type="checkbox" id="appr"> Approval mode: ask me before publishing (off = Auto mode)</label>
+        <label>Approval mode: publish anyway if I don't answer within (minutes, 0 = never)</label><input id="autopub" type="number" min="0">
+        <label>Publish to</label><div id="targets" class="row"></div>
+        <div class="row"><div class="grow"><label>Medium post status</label>
+          <select id="mstatus"><option value="draft">draft</option><option value="public">public</option><option value="unlisted">unlisted</option></select></div></div>
+        <label class="switch"><input type="checkbox" id="mnotify"> Notify my Medium followers</label>
+        <label class="switch"><input type="checkbox" id="devpub"> Publish on dev.to immediately (otherwise draft)</label>
+      </div>
+
+      <div class="card">
+        <div class="tag-title bg-orange">📰 News sources</div>
+        <label class="switch"><input type="checkbox" id="hn"> Hacker News</label>
+        <label>Hacker News stories to scan</label><input id="hnlimit" type="number" min="5" max="100">
+        <label class="switch"><input type="checkbox" id="rd"> Reddit</label>
+        <label>Subreddits (comma separated)</label><input id="subs">
+        <label>RSS feeds (one per line)</label><textarea id="rss"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tag-title bg-purple">🧪 Advanced (YAML)</div>
+      <p class="hint">Your overrides in <b>config.local.yaml</b>. Add custom post types under <code>blog.angles</code>. See docs/CONFIGURATION.md.</p>
+      <textarea id="yaml" style="min-height:220px" placeholder="(no overrides yet - using config.yaml defaults)"></textarea>
+      <div class="row"><button class="btn white" onclick="saveYaml()">Save YAML</button>
+        <button class="btn red" onclick="resetSettings()">Reset everything to defaults</button></div>
+    </div>
+
+    <div class="savebar"><button class="btn green" onclick="saveSettings()">💾 Save settings</button>
+      <span>Changes apply right away, including the schedule.</span></div>
+  </section>
+
+  <!-- STATUS -->
+  <section id="status" class="tab"><div class="card" id="statusView"></div></section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN = new URLSearchParams(location.search).get("token") || "";
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const md = s => (window.marked && window.DOMPurify) ? DOMPurify.sanitize(marked.parse(s || "")) : `<pre style="white-space:pre-wrap">${esc(s)}</pre>`;
+const csv = s => s.split(",").map(x => x.trim()).filter(Boolean);
+let current = null, NOTES = [], S = null, ANGLES = {};
+
+async function api(path, method = "GET", body) {
+  const r = await fetch(path, { method, headers: { "Content-Type": "application/json", "x-token": TOKEN }, body: body ? JSON.stringify(body) : undefined });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.detail || r.statusText);
+  return data;
+}
+function toast(msg, err = false) { const t = $("toast"); t.textContent = msg; t.className = "toast" + (err ? " err" : ""); t.style.display = "block"; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = "none", err ? 7000 : 3500); }
+async function safe(fn) { try { await fn(); } catch (e) { toast(e.message, true); } }
+
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button, .tab").forEach(x => x.classList.remove("active"));
+  b.classList.add("active"); $(b.dataset.tab).classList.add("active");
+  ({ profile: loadProfile, status: loadStatus, settings: loadSettings })[b.dataset.tab]?.();
+});
+
+/* ---------------- posts ---------------- */
+async function loadPosts() {
+  const posts = await api("/api/posts");
+  $("postList").innerHTML = posts.map(p => `
+    <div class="item ${current === p.id ? "sel" : ""}" onclick="openPost(${p.id})">
+      <div class="t">#${p.id} ${esc(p.title)}</div>
+      <div class="m"><span class="badge s-${p.status}">${p.status}</span> ${esc(p.angle)} · ${esc(p.created_at)}</div>
+    </div>`).join("") || `<div class="empty">No posts yet. Hit ⚡ Write now.</div>`;
+}
+async function openPost(id) {
+  current = id; loadPosts();
+  const p = await api(`/api/posts/${id}`);
+  const links = Object.entries(p.published || {}).map(([k, v]) => `<div><b>${esc(k)}:</b> <a href="${esc(v)}" target="_blank">${esc(v)}</a></div>`).join("");
+  $("postView").innerHTML = `
+    <div class="row"><span class="badge s-${p.status}">${p.status}</span><span>${esc(p.angle)} · ${esc(p.topic)}</span></div>
+    ${p.error ? `<p class="badge s-failed">${esc(p.error)}</p>` : ""}${links}
+    <div class="row">
+      <button class="btn green" onclick="act('publish')">✅ Publish</button>
+      <button class="btn white" onclick="toggleEdit()">✏️ Edit text</button>
+      <button class="btn red" onclick="act('reject')">❌ Skip</button>
+    </div>
+    <div class="row"><input class="grow" id="instr" placeholder="Ask the AI to change it, e.g. 'more casual, add an example'"><button class="btn pink" onclick="revise()">🔁 Rewrite</button></div>
+    <div id="editBox" style="display:none">
+      <label>Title</label><input id="eTitle" value="${esc(p.title)}">
+      <label>Subtitle</label><input id="eSub" value="${esc(p.subtitle)}">
+      <label>Tags (comma separated)</label><input id="eTags" value="${esc((p.tags || []).join(", "))}">
+      <label>Body (Markdown)</label><textarea id="eBody" style="min-height:400px">${esc(p.body)}</textarea>
+      <div class="row"><button class="btn green" onclick="saveEdit()">Save</button></div>
+    </div>
+    <div class="preview"><h1>${esc(p.title)}</h1><p><i>${esc(p.subtitle)}</i></p>
+      <p>${(p.tags || []).map(t => `<span class="badge bg-yellow">${esc(t)}</span>`).join(" ")}</p>${md(p.body)}</div>`;
+}
+function toggleEdit() { const b = $("editBox"); b.style.display = b.style.display === "none" ? "block" : "none"; }
+const act = what => safe(async () => {
+  if (what === "publish" && !confirm("Publish this post now?")) return;
+  await api(`/api/posts/${current}/${what}`, "POST"); toast(what === "publish" ? "Published - check the links" : "Skipped"); openPost(current);
+});
+const revise = () => safe(async () => {
+  const instructions = $("instr").value.trim(); if (!instructions) return;
+  await api(`/api/posts/${current}/revise`, "POST", { instructions }); toast("Rewriting… refresh in a minute");
+});
+const saveEdit = () => safe(async () => {
+  await api(`/api/posts/${current}`, "PUT", { title: $("eTitle").value, subtitle: $("eSub").value, body: $("eBody").value, tags: csv($("eTags").value) });
+  toast("Saved"); openPost(current);
+});
+const generate = () => safe(async () => {
+  const r = await api("/api/generate", "POST", { angle: $("angle").value, topic: $("topic").value });
+  toast(r.message); setTimeout(loadPosts, 60000);
+});
+
+/* ---------------- profile ---------------- */
+async function loadProfile() {
+  const r = await api("/api/profile");
+  $("profileText").value = r.profile; NOTES = r.notes;
+  $("notes").innerHTML = r.notes.map((n, i) => `
+    <div class="row" style="justify-content:space-between"><b>📄 ${esc(n.name)}</b>
+    <span><button class="btn white sm" onclick="editNote(${i})">Edit</button> <button class="btn red sm" onclick="delNote(${i})">Delete</button></span></div>`).join("") || `<p class="hint">No notes yet.</p>`;
+}
+function editNote(i) { $("noteName").value = NOTES[i].name; $("noteContent").value = NOTES[i].content; }
+const saveProfile = () => safe(async () => { await api("/api/profile", "PUT", { profile: $("profileText").value }); toast("Profile saved"); });
+const saveNote = () => safe(async () => {
+  if (!$("noteName").value.trim()) return toast("Give the note a name", true);
+  await api(`/api/notes/${encodeURIComponent($("noteName").value.trim())}`, "PUT", { content: $("noteContent").value });
+  $("noteName").value = $("noteContent").value = ""; toast("Note saved"); loadProfile();
+});
+const delNote = i => safe(async () => { if (confirm("Delete " + NOTES[i].name + "?")) { await api(`/api/notes/${encodeURIComponent(NOTES[i].name)}`, "DELETE"); loadProfile(); } });
+
+/* ---------------- settings ---------------- */
+const DAYS = { "*": "Every day", "mon-fri": "Weekdays", "sat,sun": "Weekends" };
+function angleOptions(sel) { return Object.entries(ANGLES).map(([k, v]) => `<option value="${esc(k)}" ${k === sel ? "selected" : ""}>${esc(k)} - ${esc(v.label || "")}</option>`).join(""); }
+function slotRow(s = { time: "10:00", angle: "news", days: "*", enabled: true }) {
+  const d = s.days || "*", custom = !(d in DAYS);
+  return `<tr>
+    <td><input type="checkbox" class="s-on" ${s.enabled === false ? "" : "checked"}></td>
+    <td><input type="time" class="s-time" value="${esc(s.time)}" style="width:130px"></td>
+    <td><select class="s-angle">${angleOptions(s.angle)}</select></td>
+    <td><select class="s-days">${Object.entries(DAYS).map(([k, v]) => `<option value="${k}" ${k === d ? "selected" : ""}>${v}</option>`).join("")}
+        ${custom ? `<option value="${esc(d)}" selected>${esc(d)}</option>` : ""}</select></td>
+    <td><button class="btn red sm" onclick="this.closest('tr').remove()">✕</button></td></tr>`;
+}
+function addSlot() { $("slots").insertAdjacentHTML("beforeend", slotRow()); }
+function modelBlock(role, m, providers) {
+  return `<h3>${role === "writer" ? "Writer (writes posts)" : "Scout (picks stories)"}</h3>
+    <div class="row">
+      <div class="grow"><label>Provider</label><select id="${role}-prov">${providers.map(p => `<option ${p === m.provider ? "selected" : ""}>${esc(p)}</option>`).join("")}</select></div>
+      <div class="grow"><label>Model</label><input id="${role}-model" value="${esc(m.model)}"></div>
+      <div><label>Effort</label><select id="${role}-effort">${["", "low", "medium", "high", "xhigh", "max"].map(e => `<option value="${e}" ${e === (m.effort || "") ? "selected" : ""}>${e || "default"}</option>`).join("")}</select></div>
+    </div>`;
+}
+async function loadSettings() {
+  const r = await api("/api/settings"); S = r.settings; ANGLES = r.angles;
+  const b = S.blog, src = b.sources || {}, pub = S.publish || {};
+  $("tz").value = S.timezone || "";
+  $("slots").innerHTML = (b.schedule || []).map(slotRow).join("");
+  $("wmin").value = b.words_min; $("wmax").value = b.words_max; $("review").checked = !!b.review_pass;
+  $("topics").value = (b.topics || []).join(", "); $("avoid").value = (b.avoid || []).join(", ");
+  const provs = Object.keys(S.providers);
+  $("models").innerHTML = modelBlock("writer", S.models.writer, provs) + modelBlock("scout", S.models.scout, provs);
+  $("providers").innerHTML = Object.entries(S.providers).map(([n, p]) => `<tr><td><b>${esc(n)}</b></td><td>${esc(p.type)}</td>
+    <td>${p.type === "openai_compatible" ? `<input class="p-url" data-name="${esc(n)}" value="${esc(p.base_url)}">` : "official API"}</td></tr>`).join("");
+  $("appr").checked = S.approval?.required !== false; $("autopub").value = S.approval?.auto_publish_after_minutes || 0;
+  $("targets").innerHTML = r.publishers.map(t => `<label class="switch"><input type="checkbox" class="t-pub" value="${t}" ${(pub.targets || []).includes(t) ? "checked" : ""}> ${t}</label>`).join("");
+  $("mstatus").value = pub.medium?.publish_status || "draft"; $("mnotify").checked = !!pub.medium?.notify_followers; $("devpub").checked = !!pub.devto?.published;
+  $("hn").checked = !!src.hackernews?.enabled; $("hnlimit").value = src.hackernews?.limit || 40;
+  $("rd").checked = !!src.reddit?.enabled; $("subs").value = (src.reddit?.subreddits || []).join(", ");
+  $("rss").value = (src.rss || []).join("\n");
+  $("yaml").value = r.local_yaml;
+}
+const saveSettings = () => safe(async () => {
+  const schedule = [...document.querySelectorAll("#slots tr")].map(tr => {
+    const s = { time: tr.querySelector(".s-time").value, angle: tr.querySelector(".s-angle").value };
+    const days = tr.querySelector(".s-days").value; if (days !== "*") s.days = days;
+    if (!tr.querySelector(".s-on").checked) s.enabled = false;
+    return s;
+  }).sort((a, b) => a.time.localeCompare(b.time));
+  const providers = JSON.parse(JSON.stringify(S.providers));
+  document.querySelectorAll(".p-url").forEach(i => providers[i.dataset.name].base_url = i.value.trim());
+  const model = role => { const m = { provider: $(`${role}-prov`).value, model: $(`${role}-model`).value.trim() }; const e = $(`${role}-effort`).value; if (e) m.effort = e; return m; };
+  const body = {
+    timezone: $("tz").value.trim(),
+    models: { writer: model("writer"), scout: model("scout") },
+    providers,
+    blog: {
+      schedule, words_min: +$("wmin").value, words_max: +$("wmax").value, review_pass: $("review").checked,
+      topics: csv($("topics").value), avoid: csv($("avoid").value),
+      sources: {
+        hackernews: { enabled: $("hn").checked, limit: +$("hnlimit").value },
+        reddit: { enabled: $("rd").checked, limit: S.blog.sources?.reddit?.limit || 15, subreddits: csv($("subs").value) },
+        rss: $("rss").value.split("\n").map(x => x.trim()).filter(Boolean),
+      },
+    },
+    approval: { required: $("appr").checked, auto_publish_after_minutes: +$("autopub").value },
+    publish: {
+      targets: [...document.querySelectorAll(".t-pub:checked")].map(i => i.value),
+      medium: { publish_status: $("mstatus").value, notify_followers: $("mnotify").checked },
+      devto: { published: $("devpub").checked },
+    },
+  };
+  await api("/api/settings", "PUT", body); toast("Settings saved ✔"); loadSettings();
+  const st = await api("/api/status"); showMode(st.mode, st.paused);
+});
+const saveYaml = () => safe(async () => { await api("/api/settings/yaml", "PUT", { yaml: $("yaml").value }); toast("YAML saved ✔"); loadSettings(); });
+const resetSettings = () => safe(async () => { if (!confirm("Delete config.local.yaml and go back to the defaults?")) return; await api("/api/settings/reset", "POST"); toast("Back to defaults"); loadSettings(); });
+
+/* ---------------- status ---------------- */
+async function loadStatus() {
+  const s = await api("/api/status");
+  const yes = (ok, a, b) => ok ? `<span class="badge s-published">${a}</span>` : `<span class="badge s-failed">${b}</span>`;
+  $("statusView").innerHTML = `<div class="tag-title bg-blue">📡 Status</div><table>
+    <tr><td>Writer model</td><td>${esc(s.writer.provider)} / ${esc(s.writer.model)}</td></tr>
+    <tr><td>Scout model</td><td>${esc(s.scout.provider)} / ${esc(s.scout.model)}</td></tr>
+    <tr><td>Publish to</td><td>${esc(s.targets.join(", ") || "nothing")}</td></tr>
+    <tr><td>Medium token</td><td>${yes(s.medium, "set", "missing")}</td></tr>
+    <tr><td>dev.to key</td><td>${yes(s.devto, "set", "missing")}</td></tr>
+    <tr><td>Telegram bot</td><td>${yes(s.telegram, "connected", "not set up")}</td></tr>
+    <tr><td>Scheduler</td><td>${yes(s.scheduler_running, "running", "off")}</td></tr></table>
+    <h3>Next runs</h3><table>${s.schedule.map(j => `<tr><td><b>${esc(j.time)}</b></td><td>${esc(j.angle)}</td><td>${esc(j.next)}</td></tr>`).join("") || "<tr><td>No slots scheduled</td></tr>"}</table>`;
+}
+
+/* ---------------- mode / pause ---------------- */
+let PAUSED = false;
+function showMode(mode, paused) {
+  $("m-approval").classList.toggle("on", mode === "approval"); $("m-auto").classList.toggle("on", mode === "auto");
+  PAUSED = paused; $("pauseBtn").textContent = paused ? "▶️ Resume" : "⏸ Pause"; $("pauseBtn").classList.toggle("paused", paused);
+}
+const setMode = mode => safe(async () => {
+  if (mode === "auto" && !confirm("Auto mode: the agent will publish posts WITHOUT asking you. Continue?")) return;
+  await api("/api/settings", "PUT", { approval: { required: mode === "approval" } });
+  const s = await api("/api/status"); showMode(s.mode, s.paused);
+  toast(mode === "auto" ? "🤖 Auto mode: posts publish on their own" : "🤝 Approval mode: posts wait for your OK");
+});
+const togglePause = () => safe(async () => {
+  await api("/api/settings", "PUT", { paused: !PAUSED });
+  const s = await api("/api/status"); showMode(s.mode, s.paused); toast(s.paused ? "Schedule paused" : "Schedule running");
+});
+
+(async () => safe(async () => {
+  const s = await api("/api/status");
+  showMode(s.mode, s.paused);
+  $("ver").textContent = "v" + s.version;
+  $("angle").innerHTML = s.angles.map(a => `<option>${esc(a)}</option>`).join("");
+  ANGLES = Object.fromEntries(s.angles.map(a => [a, {}]));
+  loadPosts(); setInterval(loadPosts, 30000);
+}))();
+</script>
+</body>
+</html>
